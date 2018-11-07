@@ -11,6 +11,11 @@ import (
 type Readability struct {
 	doc *html.Node
 	uri *url.URL
+
+	// MaxElemsToParse is the optional maximum number of HTML nodes to parse
+	// from the document. If the number of elements in the document is higher
+	// than this number, the operation immediately errors.
+	MaxElemsToParse int
 }
 
 // Article represents the metadata and content of the article.
@@ -74,5 +79,12 @@ func New(reader io.Reader, rawurl string) (*Readability, error) {
 
 // Parse runs readability.
 func (r *Readability) Parse() (Article, error) {
+	if r.MaxElemsToParse > 0 {
+		numTags := len(getElementsByTagName(r.doc, "*"))
+		if numTags > r.MaxElemsToParse {
+			return Article{}, fmt.Errorf("aborting parsing document; %d elements found", numTags)
+		}
+	}
+
 	return Article{}, nil
 }
