@@ -1,6 +1,8 @@
 package readability
 
 import (
+	"bytes"
+
 	"golang.org/x/net/html"
 )
 
@@ -26,4 +28,25 @@ func getElementsByTagName(doc *html.Node, tag string) []*html.Node {
 	find(doc)
 
 	return list
+
+// textContent returns text content of a node and its descendants.
+//
+// See: https://developer.mozilla.org/en-US/docs/Web/API/Node/textContent
+func textContent(node *html.Node) string {
+	var buf bytes.Buffer
+	var fun func(*html.Node)
+
+	fun = func(n *html.Node) {
+		if n.Type == html.TextNode {
+			buf.WriteString(n.Data)
+		}
+
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			fun(c)
+		}
+	}
+
+	fun(node)
+
+	return buf.String()
 }
