@@ -61,20 +61,42 @@ type Article struct {
 	Length int
 }
 
-func New(reader io.Reader, rawurl string) (*Readability, error) {
+func New(reader io.Reader, rawurl string) (Readability, error) {
 	var err error
-
-	r := new(Readability)
+	var r Readability
 
 	if r.uri, err = url.ParseRequestURI(rawurl); err != nil {
-		return nil, fmt.Errorf("url.ParseRequestURI %s", err)
+		return Readability{}, fmt.Errorf("url.ParseRequestURI %s", err)
 	}
 
 	if r.doc, err = html.Parse(reader); err != nil {
-		return nil, fmt.Errorf("html.Parse %s", err)
+		return Readability{}, fmt.Errorf("html.Parse %s", err)
 	}
 
 	return r, nil
+}
+
+// removeNodes iterates over a collection of HTML elements, calls the optional
+// filter function on each node, and removes the node if function returns True.
+// If function is not passed, removes all the nodes in the list.
+func (r *Readability) removeNodes(list []*html.Node, filter func(*html.Node) bool) {
+	var node *html.Node
+	var parentNode *html.Node
+
+	for i := len(list) - 1; i >= 0; i-- {
+		node = list[i]
+		parentNode = node.Parent
+
+		if parentNode != nil && (filter == nil || filter(node)) {
+			parentNode.RemoveChild(node)
+		}
+	}
+}
+
+// removeScripts removes script tags from the document.
+func (r *Readability) removeScripts(doc *html.Node) {
+	r.removeNodes(getElementsByTagName(doc, "script"), nil)
+	r.removeNodes(getElementsByTagName(doc, "noscript"), nil)
 }
 
 // Parse runs readability.
@@ -85,6 +107,8 @@ func (r *Readability) Parse() (Article, error) {
 			return Article{}, fmt.Errorf("aborting parsing document; %d elements found", numTags)
 		}
 	}
+
+	r.removeScripts(r.doc)
 
 	return Article{}, nil
 }
