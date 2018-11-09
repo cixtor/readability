@@ -6,6 +6,23 @@ import (
 	"golang.org/x/net/html"
 )
 
+// appendChild adds a node to the end of the list of children of a specified
+// parent node. If the given child is a reference to an existing node in the
+// document, appendChild moves it from its current position to the new position
+// (there is no requirement to remove the node from its parent node before
+// appending it to some other node).
+//
+// See: https://developer.mozilla.org/en-US/docs/Web/API/Node/appendChild
+func appendChild(node *html.Node, child *html.Node) {
+	if child.Parent != nil {
+		temp := cloneNode(child)
+		node.AppendChild(temp)
+		child.Parent.RemoveChild(child)
+		return
+	}
+
+	node.AppendChild(child)
+}
 // getElementsByTagName returns a collection of HTML elements with the given
 // tag name. If tag name is an asterisk, a list of all the available HTML nodes
 // will be returned instead.
