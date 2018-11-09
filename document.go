@@ -23,6 +23,17 @@ func appendChild(node *html.Node, child *html.Node) {
 
 	node.AppendChild(child)
 }
+
+// childNodes returns list of a node's direct children.
+func childNodes(node *html.Node) []*html.Node {
+	var list []*html.Node
+
+	for c := node.FirstChild; c != nil; c = c.NextSibling {
+		list = append(list, c)
+	}
+
+	return list
+}
 // getElementsByTagName returns a collection of HTML elements with the given
 // tag name. If tag name is an asterisk, a list of all the available HTML nodes
 // will be returned instead.
