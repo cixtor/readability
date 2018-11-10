@@ -34,6 +34,26 @@ func childNodes(node *html.Node) []*html.Node {
 
 	return list
 }
+
+// cloneNode returns a duplicate of the node on which this method was called.
+//
+// See: https://developer.mozilla.org/en-US/docs/Web/API/Node/cloneNode
+func cloneNode(node *html.Node) *html.Node {
+	clone := &html.Node{
+		Type:     node.Type,
+		DataAtom: node.DataAtom,
+		Data:     node.Data,
+		Attr:     make([]html.Attribute, len(node.Attr)),
+	}
+
+	copy(clone.Attr, node.Attr)
+
+	for c := node.FirstChild; c != nil; c = c.NextSibling {
+		clone.AppendChild(cloneNode(c))
+	}
+
+	return clone
+}
 // getElementsByTagName returns a collection of HTML elements with the given
 // tag name. If tag name is an asterisk, a list of all the available HTML nodes
 // will be returned instead.
