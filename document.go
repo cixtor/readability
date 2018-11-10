@@ -54,6 +54,14 @@ func cloneNode(node *html.Node) *html.Node {
 
 	return clone
 }
+
+// createElement creates the HTML element specified by tagName.
+//
+// See: https://developer.mozilla.org/en-US/docs/Web/API/Document/createElement
+func createElement(tagName string) *html.Node {
+	return &html.Node{Type: html.ElementNode, Data: tagName}
+}
+
 // getElementsByTagName returns a collection of HTML elements with the given
 // tag name. If tag name is an asterisk, a list of all the available HTML nodes
 // will be returned instead.
