@@ -67,23 +67,24 @@ func createElement(tagName string) *html.Node {
 // will be returned instead.
 //
 // See: https://developer.mozilla.org/en-US/docs/Web/API/Document/getElementsByTagName
-func getElementsByTagName(doc *html.Node, tag string) []*html.Node {
-	var list []*html.Node
-	var find func(*html.Node)
+func getElementsByTagName(node *html.Node, tag string) []*html.Node {
+	var lst []*html.Node
+	var fun func(*html.Node)
 
-	find = func(node *html.Node) {
-		if node.Type == html.ElementNode && (tag == "*" || node.Data == tag) {
-			list = append(list, node)
+	fun = func(n *html.Node) {
+		if n.Type == html.ElementNode && (tag == "*" || n.Data == tag) {
+			lst = append(lst, n)
 		}
 
-		for c := node.FirstChild; c != nil; c = c.NextSibling {
-			find(c)
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			fun(c)
 		}
 	}
 
-	find(doc)
+	fun(node)
 
-	return list
+	return lst
+}
 
 // textContent returns text content of a node and its descendants.
 //
