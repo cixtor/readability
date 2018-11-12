@@ -86,6 +86,17 @@ func getElementsByTagName(node *html.Node, tag string) []*html.Node {
 	return lst
 }
 
+// indexOf returns the first index at which a given element can be found in the
+// array, or -1 if it is not present.
+func indexOf(array []string, key string) int {
+	for idx, val := range array {
+		if val == key {
+			return idx
+		}
+	}
+
+	return -1
+}
 // textContent returns text content of a node and its descendants.
 //
 // See: https://developer.mozilla.org/en-US/docs/Web/API/Node/textContent
