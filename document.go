@@ -97,6 +97,21 @@ func indexOf(array []string, key string) int {
 
 	return -1
 }
+
+// replaceNode replaces a child node within the given (parent) node.
+//
+// See: https://developer.mozilla.org/en-US/docs/Web/API/Node/replaceChild
+func replaceNode(oldNode *html.Node, newNode *html.Node) {
+	if oldNode.Parent == nil {
+		return
+	}
+
+	newNode.Parent = nil
+	newNode.PrevSibling = nil
+	newNode.NextSibling = nil
+	oldNode.Parent.InsertBefore(newNode, oldNode)
+	oldNode.Parent.RemoveChild(oldNode)
+}
 // textContent returns text content of a node and its descendants.
 //
 // See: https://developer.mozilla.org/en-US/docs/Web/API/Node/textContent
