@@ -112,6 +112,21 @@ func replaceNode(oldNode *html.Node, newNode *html.Node) {
 	oldNode.Parent.InsertBefore(newNode, oldNode)
 	oldNode.Parent.RemoveChild(oldNode)
 }
+
+// tagName returns the tag name of the element on which it’s called.
+//
+// For example, if the element is an <img>, its tagName property is “IMG” (for
+// HTML documents; it may be cased differently for XML/XHTML documents).
+//
+// See: https://developer.mozilla.org/en-US/docs/Web/API/Element/tagName
+func tagName(node *html.Node) string {
+	if node.Type != html.ElementNode {
+		return ""
+	}
+
+	return node.Data
+}
+
 // textContent returns text content of a node and its descendants.
 //
 // See: https://developer.mozilla.org/en-US/docs/Web/API/Node/textContent
