@@ -99,6 +99,15 @@ func (r *Readability) removeScripts(doc *html.Node) {
 	r.removeNodes(getElementsByTagName(doc, "noscript"), nil)
 }
 
+
+func (r *Readability) isWhitespace(node *html.Node) bool {
+	if node.Type == html.TextNode && strings.TrimSpace(textContent(node)) == "" {
+		return true
+	}
+
+	return node.Type == html.ElementNode && tagName(node) == "br"
+}
+
 // Parse runs readability.
 func (r *Readability) Parse() (Article, error) {
 	if r.MaxElemsToParse > 0 {
