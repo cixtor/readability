@@ -93,6 +93,20 @@ func (r *Readability) removeNodes(list []*html.Node, filter func(*html.Node) boo
 	}
 }
 
+
+// everyNode iterates over a collection of nodes, returns true if all of the
+// provided iterator function calls return true, otherwise returns false. For
+// convenience, the current object context is applied to the provided iterator
+// function.
+func (r *Readability) everyNode(list []*html.Node, fn func(*html.Node) bool) bool {
+	for _, node := range list {
+		if !fn(node) {
+			return false
+		}
+	}
+
+	return true
+}
 // removeScripts removes script tags from the document.
 func (r *Readability) removeScripts(doc *html.Node) {
 	r.removeNodes(getElementsByTagName(doc, "script"), nil)
