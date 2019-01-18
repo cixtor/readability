@@ -93,6 +93,14 @@ func (r *Readability) removeNodes(list []*html.Node, filter func(*html.Node) boo
 	}
 }
 
+// forEachNode iterates over a list of HTML nodes, which doesn’t natively fully
+// implement the Array interface. For convenience, the current object context
+// is applied to the provided iterate function.
+func (r *Readability) forEachNode(list []*html.Node, fn func(*html.Node, int)) {
+	for idx, node := range list {
+		fn(node, idx)
+	}
+}
 
 // everyNode iterates over a collection of nodes, returns true if all of the
 // provided iterator function calls return true, otherwise returns false. For
