@@ -115,6 +115,16 @@ func (r *Readability) everyNode(list []*html.Node, fn func(*html.Node) bool) boo
 
 	return true
 }
+
+func (r *Readability) getAllNodesWithTag(node *html.Node, tagNames ...string) []*html.Node {
+	var list []*html.Node
+
+	for _, tag := range tagNames {
+		list = append(list, getElementsByTagName(node, tag)...)
+	}
+
+	return list
+}
 // removeScripts removes script tags from the document.
 func (r *Readability) removeScripts(doc *html.Node) {
 	r.removeNodes(getElementsByTagName(doc, "script"), nil)
