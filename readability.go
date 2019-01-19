@@ -125,6 +125,17 @@ func (r *Readability) getAllNodesWithTag(node *html.Node, tagNames ...string) []
 
 	return list
 }
+func (r *Readability) setNodeTag(node *html.Node, newTagName string) {
+	if node.Type == html.ElementNode {
+		node.Data = newTagName
+	}
+
+	// NOTES(cixtor): the original function in Readability.js is a bit longer
+	// because it contains a fallback mechanism to set the node tag name just
+	// in case JSDOMParser is not available, there is no need to implement this
+	// here.
+}
+
 // removeScripts removes script tags from the document.
 func (r *Readability) removeScripts(doc *html.Node) {
 	r.removeNodes(getElementsByTagName(doc, "script"), nil)
