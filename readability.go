@@ -8,6 +8,18 @@ import (
 	"golang.org/x/net/html"
 )
 
+
+// The commented out elements qualify as phrasing content but tend to be
+// removed by readability when put into paragraphs, so we ignore them here.
+var phrasingElems = []string{
+	// "canvas", "iframe", "svg", "video",
+	"abbr", "audio", "b", "bdo", "br", "button", "cite", "code", "data",
+	"datalist", "dfn", "em", "embed", "i", "img", "input", "kbd", "label",
+	"mark", "math", "meter", "noscript", "object", "output", "progress", "q",
+	"ruby", "samp", "script", "select", "small", "span", "strong", "sub",
+	"sup", "textarea", "time", "var", "wbr",
+}
+
 type Readability struct {
 	doc *html.Node
 	uri *url.URL
@@ -142,6 +154,23 @@ func (r *Readability) removeScripts(doc *html.Node) {
 	r.removeNodes(getElementsByTagName(doc, "noscript"), nil)
 }
 
+// isPhrasingContent determines if a node qualifies as phrasing content.
+//
+// See: https://developer.mozilla.org/en-US/docs/Web/Guide/HTML/Content_categories#Phrasing_content
+func (r *Readability) isPhrasingContent(node *html.Node) bool {
+	if node.Type == html.TextNode {
+		return true
+	}
+
+	tag := tagName(node)
+
+	if indexOf(phrasingElems, tag) != -1 {
+		return true
+	}
+
+	return ((tag == "a" || tag == "del" || tag == "ins") &&
+		r.everyNode(childNodes(node), r.isPhrasingContent))
+}
 
 func (r *Readability) isWhitespace(node *html.Node) bool {
 	if node.Type == html.TextNode && strings.TrimSpace(textContent(node)) == "" {
