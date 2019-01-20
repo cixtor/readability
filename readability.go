@@ -4,10 +4,15 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"regexp"
+	"strings"
 
 	"golang.org/x/net/html"
 )
 
+// All of the regular expressions in use within readability.
+// Defined up here so we don't instantiate them repeatedly in loops.
+var rxWhitespace = regexp.MustCompile(`^\s*$`)
 
 // The commented out elements qualify as phrasing content but tend to be
 // removed by readability when put into paragraphs, so we ignore them here.
@@ -136,6 +141,21 @@ func (r *Readability) getAllNodesWithTag(node *html.Node, tagNames ...string) []
 	}
 
 	return list
+}
+
+// nextElement finds the next element, starting from the given node, and
+// ignoring whitespace in between. If the given node is an element, the same
+// node is returned.
+func (r *Readability) nextElement(node *html.Node) *html.Node {
+	next := node
+
+	for next != nil &&
+		next.Type != html.ElementNode &&
+		rxWhitespace.MatchString(textContent(next)) {
+		next = next.NextSibling
+	}
+
+	return next
 }
 func (r *Readability) setNodeTag(node *html.Node, newTagName string) {
 	if node.Type == html.ElementNode {
