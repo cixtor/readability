@@ -157,6 +157,78 @@ func (r *Readability) nextElement(node *html.Node) *html.Node {
 
 	return next
 }
+
+// replaceBrs replaces two or more successive <br> elements with a single <p>.
+// Whitespace between <br> elements are ignored. For example:
+//
+//   <div>foo<br>bar<br> <br><br>abc</div>
+//
+// will become:
+//
+//   <div>foo<br>bar<p>abc</p></div>
+func (r *Readability) replaceBrs(elem *html.Node) {
+	r.forEachNode(r.getAllNodesWithTag(elem, "br"), func(br *html.Node, _ int) {
+		next := br.NextSibling
+
+		// Whether two or more <br> elements have been found and replaced with
+		// a <p> block.
+		replaced := false
+
+		// If we find a <br> chain, remove the <br> nodes until we hit another
+		// element or non-whitespace. This leaves behind the first <br> in the
+		// chain (which will be replaced with a <p> later).
+		for {
+			next = r.nextElement(next)
+
+			if next == nil || tagName(next) == "BR" {
+				break
+			}
+
+			replaced = true
+			brSibling := next.NextSibling
+			next.Parent.RemoveChild(next)
+			next = brSibling
+		}
+
+		// If we removed a <br> chain, replace the remaining <br> with a <p>.
+		// Add all sibling nodes as children of the <p> until we hit another
+		// <br> chain.
+		if replaced {
+			p := createElement("p")
+			replaceNode(br, p)
+
+			next = p.NextSibling
+			for next != nil {
+				// If we have hit another <br><br>, we are done adding children
+				// to this <p>.
+				if tagName(next) == "br" {
+					nextElem := r.nextElement(next.NextSibling)
+					if nextElem != nil && tagName(nextElem) == "br" {
+						break
+					}
+				}
+
+				if !r.isPhrasingContent(next) {
+					break
+				}
+
+				// Otherwise, make this node a child of the new <p>.
+				sibling := next.NextSibling
+				appendChild(p, next)
+				next = sibling
+			}
+
+			for p.LastChild != nil && r.isWhitespace(p.LastChild) {
+				p.RemoveChild(p.LastChild)
+			}
+
+			if tagName(p.Parent) == "P" {
+				r.setNodeTag(p.Parent, "div")
+			}
+		}
+	})
+}
+
 func (r *Readability) setNodeTag(node *html.Node, newTagName string) {
 	if node.Type == html.ElementNode {
 		node.Data = newTagName
