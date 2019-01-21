@@ -151,6 +151,21 @@ func (r *Readability) getAllNodesWithTag(node *html.Node, tagNames ...string) []
 	return list
 }
 
+// prepDocument prepares the HTML document for readability to scrape it. This
+// includes things like stripping JavaScript, CSS, and handling terrible markup
+// among other things.
+func (r *Readability) prepDocument() {
+	doc := r.doc
+
+	r.removeNodes(getElementsByTagName(doc, "style"), nil)
+
+	if n := getElementsByTagName(doc, "body"); len(n) > 0 && n[0] != nil {
+		r.replaceBrs(n[0])
+	}
+
+	r.replaceNodeTags(getElementsByTagName(doc, "font"), "SPAN")
+}
+
 // nextElement finds the next element, starting from the given node, and
 // ignoring whitespace in between. If the given node is an element, the same
 // node is returned.
@@ -290,6 +305,8 @@ func (r *Readability) Parse() (Article, error) {
 	}
 
 	r.removeScripts(r.doc)
+
+	r.prepDocument()
 
 	return Article{}, nil
 }
