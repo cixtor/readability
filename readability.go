@@ -110,6 +110,14 @@ func (r *Readability) removeNodes(list []*html.Node, filter func(*html.Node) boo
 	}
 }
 
+// replaceNodeTags iterates over a list, and calls setNodeTag for each node.
+func (r *Readability) replaceNodeTags(list []*html.Node, newTagName string) {
+	for i := len(list) - 1; i >= 0; i-- {
+		node := list[i]
+		r.setNodeTag(node, newTagName)
+	}
+}
+
 // forEachNode iterates over a list of HTML nodes, which doesn’t natively fully
 // implement the Array interface. For convenience, the current object context
 // is applied to the provided iterate function.
