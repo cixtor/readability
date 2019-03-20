@@ -12,6 +12,7 @@ import (
 
 // All of the regular expressions in use within readability.
 // Defined up here so we don't instantiate them repeatedly in loops.
+var rxNormalize = regexp.MustCompile(`/\s{2,}/g`)
 var rxWhitespace = regexp.MustCompile(`^\s*$`)
 
 // The commented out elements qualify as phrasing content but tend to be
@@ -293,6 +294,19 @@ func (r *Readability) isWhitespace(node *html.Node) bool {
 	}
 
 	return node.Type == html.ElementNode && tagName(node) == "br"
+}
+
+// getInnerText gets the inner text of a node.
+// This also strips out any excess whitespace to be found.
+// In Readability.js, normalizeSpaces default to true.
+func (r *Readability) getInnerText(node *html.Node, normalizeSpaces bool) string {
+	textContent := strings.TrimSpace(textContent(node))
+
+	if normalizeSpaces {
+		textContent = rxNormalize.ReplaceAllString(textContent, "\x20")
+	}
+
+	return textContent
 }
 
 // Parse runs readability.
