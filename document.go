@@ -2,6 +2,7 @@ package readability
 
 import (
 	"bytes"
+	"strings"
 
 	"golang.org/x/net/html"
 )
@@ -84,6 +85,11 @@ func getElementsByTagName(node *html.Node, tag string) []*html.Node {
 	fun(node)
 
 	return lst
+}
+
+// wordCount returns number of word in str.
+func wordCount(str string) int {
+	return len(strings.Fields(str))
 }
 
 // indexOf returns the first index at which a given element can be found in the
