@@ -142,6 +142,17 @@ func (r *Readability) everyNode(list []*html.Node, fn func(*html.Node) bool) boo
 	return true
 }
 
+// concatNodeLists concats all nodelists passed as arguments.
+func (r *Readability) concatNodeLists(nodeLists ...[]*html.Node) []*html.Node {
+	var result []*html.Node
+
+	for i := 0; i < len(nodeLists); i++ {
+		result = append(result, nodeLists[i]...)
+	}
+
+	return result
+}
+
 func (r *Readability) getAllNodesWithTag(node *html.Node, tagNames ...string) []*html.Node {
 	var list []*html.Node
 
