@@ -128,6 +128,18 @@ func (r *Readability) forEachNode(list []*html.Node, fn func(*html.Node, int)) {
 	}
 }
 
+// someNode iterates over a NodeList, return true if any of the
+// provided iterate function calls returns true, false otherwise.
+func (r *Readability) someNode(nodeList []*html.Node, fn func(*html.Node) bool) bool {
+	for i := 0; i < len(nodeList); i++ {
+		if fn(nodeList[i]) {
+			return true
+		}
+	}
+
+	return false
+}
+
 // everyNode iterates over a collection of nodes, returns true if all of the
 // provided iterator function calls return true, otherwise returns false. For
 // convenience, the current object context is applied to the provided iterator
