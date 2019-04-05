@@ -87,6 +87,18 @@ func getElementsByTagName(node *html.Node, tag string) []*html.Node {
 	return lst
 }
 
+// getAttribute returns the value of a specified attribute on the element. If
+// the given attribute does not exist, the function returns an empty string.
+func getAttribute(node *html.Node, attrName string) string {
+	for i := 0; i < len(node.Attr); i++ {
+		if node.Attr[i].Key == attrName {
+			return node.Attr[i].Val
+		}
+	}
+
+	return ""
+}
+
 // wordCount returns number of word in str.
 func wordCount(str string) int {
 	return len(strings.Fields(str))
