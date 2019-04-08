@@ -12,7 +12,7 @@ import (
 
 // All of the regular expressions in use within readability.
 // Defined up here so we don't instantiate them repeatedly in loops.
-var rxNormalize = regexp.MustCompile(`/\s{2,}/g`)
+var rxNormalize = regexp.MustCompile(`(?i)\s{2,}`)
 var rxWhitespace = regexp.MustCompile(`^\s*$`)
 
 // The commented out elements qualify as phrasing content but tend to be
