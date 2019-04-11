@@ -14,6 +14,11 @@ import (
 // Defined up here so we don't instantiate them repeatedly in loops.
 var rxNormalize = regexp.MustCompile(`(?i)\s{2,}`)
 var rxWhitespace = regexp.MustCompile(`(?i)^\s*$`)
+var rxTitleSeparator = regexp.MustCompile(`(?i) [\|\-\\/>»] `)
+var rxTitleHierarchySep = regexp.MustCompile(`(?i) [\\/>»] `)
+var rxTitleRemoveFinalPart = regexp.MustCompile(`(?i)(.*)[\|\-\\/>»] .*`)
+var rxTitleRemove1stPart = regexp.MustCompile(`(?i)[^\|\-\\/>»]*[\|\-\\/>»](.*)`)
+var rxTitleAnySeparator = regexp.MustCompile(`(?i)[\|\-\\/>»]+`)
 
 // The commented out elements qualify as phrasing content but tend to be
 // removed by readability when put into paragraphs, so we ignore them here.
@@ -173,6 +178,81 @@ func (r *Readability) getAllNodesWithTag(node *html.Node, tagNames ...string) []
 	}
 
 	return list
+}
+
+// getArticleTitle attempts to get the article title.
+func (r *Readability) getArticleTitle() string {
+	doc := r.doc
+	curTitle := ""
+	origTitle := ""
+	titleHadHierarchicalSeparators := false
+
+	// If they had an element with tag "title" in their HTML
+	if nodes := getElementsByTagName(doc, "title"); len(nodes) > 0 {
+		origTitle = r.getInnerText(nodes[0], true)
+		curTitle = origTitle
+	}
+
+	// If there's a separator in the title, first remove the final part
+	if rxTitleSeparator.MatchString(curTitle) {
+		titleHadHierarchicalSeparators = rxTitleHierarchySep.MatchString(curTitle)
+		curTitle = rxTitleRemoveFinalPart.ReplaceAllString(origTitle, "$1")
+
+		// If the resulting title is too short (3 words or fewer), remove
+		// the first part instead:
+		if wordCount(curTitle) < 3 {
+			curTitle = rxTitleRemove1stPart.ReplaceAllString(origTitle, "$1")
+		}
+	} else if strings.Index(curTitle, ": ") != -1 {
+		// Check if we have an heading containing this exact string, so
+		// we could assume it's the full title.
+		headings := r.concatNodeLists(
+			getElementsByTagName(doc, "h1"),
+			getElementsByTagName(doc, "h2"),
+		)
+
+		trimmedTitle := strings.TrimSpace(curTitle)
+		match := r.someNode(headings, func(heading *html.Node) bool {
+			return strings.TrimSpace(textContent(heading)) == trimmedTitle
+		})
+
+		// If we don't, let's extract the title out of the original
+		// title string.
+		if !match {
+			curTitle = origTitle[strings.LastIndex(origTitle, ":")+1:]
+
+			// If the title is now too short, try the first colon instead:
+			if wordCount(curTitle) < 3 {
+				curTitle = origTitle[strings.Index(origTitle, ":")+1:]
+				// But if we have too many words before the colon there's
+				// something weird with the titles and the H tags so let's
+				// just use the original title instead
+			} else if wordCount(origTitle[:strings.Index(origTitle, ":")]) > 5 {
+				curTitle = origTitle
+			}
+		}
+	} else if len(curTitle) > 150 || len(curTitle) < 15 {
+		if hOnes := getElementsByTagName(doc, "h1"); len(hOnes) == 1 {
+			curTitle = r.getInnerText(hOnes[0], true)
+		}
+	}
+
+	curTitle = strings.TrimSpace(curTitle)
+	curTitle = rxNormalize.ReplaceAllString(curTitle, " ")
+	// If we now have 4 words or fewer as our title, and either no
+	// 'hierarchical' separators (\, /, > or ») were found in the original
+	// title or we decreased the number of words by more than 1 word, use
+	// the original title.
+	curTitleWordCount := wordCount(curTitle)
+	tmpOrigTitle := rxTitleAnySeparator.ReplaceAllString(origTitle, "")
+
+	if curTitleWordCount <= 4 &&
+		(!titleHadHierarchicalSeparators ||
+			curTitleWordCount != wordCount(tmpOrigTitle)-1) {
+		curTitle = origTitle
+	}
+
+	return curTitle
 }
 
 // prepDocument prepares the HTML document for readability to scrape it. This
