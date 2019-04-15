@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"golang.org/x/net/html"
@@ -19,6 +20,7 @@ var rxTitleHierarchySep = regexp.MustCompile(`(?i) [\\/>»] `)
 var rxTitleRemoveFinalPart = regexp.MustCompile(`(?i)(.*)[\|\-\\/>»] .*`)
 var rxTitleRemove1stPart = regexp.MustCompile(`(?i)[^\|\-\\/>»]*[\|\-\\/>»](.*)`)
 var rxTitleAnySeparator = regexp.MustCompile(`(?i)[\|\-\\/>»]+`)
+var rxFaviconSize = regexp.MustCompile(`(?i)(\d+)x(\d+)`)
 
 // The commented out elements qualify as phrasing content but tend to be
 // removed by readability when put into paragraphs, so we ignore them here.
@@ -253,6 +255,49 @@ func (r *Readability) getArticleTitle() string {
 	}
 
 	return curTitle
+}
+
+// getArticleFavicon attempts to get high quality favicon
+// that used in article. It will only pick favicon in PNG
+// format, so small favicon that uses ico file won't be picked.
+// Using algorithm by philippe_b.
+func (r *Readability) getArticleFavicon() string {
+	favicon := ""
+	faviconSize := -1
+	linkElements := getElementsByTagName(r.doc, "link")
+
+	r.forEachNode(linkElements, func(link *html.Node, _ int) {
+		linkRel := strings.TrimSpace(getAttribute(link, "rel"))
+		linkType := strings.TrimSpace(getAttribute(link, "type"))
+		linkHref := strings.TrimSpace(getAttribute(link, "href"))
+		linkSizes := strings.TrimSpace(getAttribute(link, "sizes"))
+
+		if linkHref == "" || !strings.Contains(linkRel, "icon") {
+			return
+		}
+
+		if linkType != "image/png" && !strings.Contains(linkHref, ".png") {
+			return
+		}
+
+		size := 0
+		for _, sizesLocation := range []string{linkSizes, linkHref} {
+			sizeParts := rxFaviconSize.FindStringSubmatch(sizesLocation)
+			if len(sizeParts) != 3 || sizeParts[1] != sizeParts[2] {
+				continue
+			}
+
+			size, _ = strconv.Atoi(sizeParts[1])
+			break
+		}
+
+		if size > faviconSize {
+			faviconSize = size
+			favicon = linkHref
+		}
+	})
+
+	return toAbsoluteURI(favicon, r.uri)
 }
 
 // prepDocument prepares the HTML document for readability to scrape it. This
