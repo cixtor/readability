@@ -15,6 +15,8 @@ import (
 // Defined up here so we don't instantiate them repeatedly in loops.
 var rxNormalize = regexp.MustCompile(`(?i)\s{2,}`)
 var rxWhitespace = regexp.MustCompile(`(?i)^\s*$`)
+var rxPropertyPattern = regexp.MustCompile(`(?i)\s*(dc|dcterm|og|twitter)\s*:\s*(author|creator|description|title|site_name|image\S*)\s*`)
+var rxNamePattern = regexp.MustCompile(`(?i)^\s*(?:(dc|dcterm|og|twitter|weibo:(article|webpage))\s*[\.:]\s*)?(author|creator|description|title|site_name|image)\s*$`)
 var rxTitleSeparator = regexp.MustCompile(`(?i) [\|\-\\/>»] `)
 var rxTitleHierarchySep = regexp.MustCompile(`(?i) [\\/>»] `)
 var rxTitleRemoveFinalPart = regexp.MustCompile(`(?i)(.*)[\|\-\\/>»] .*`)
@@ -410,6 +412,124 @@ func (r *Readability) setNodeTag(node *html.Node, newTagName string) {
 	// because it contains a fallback mechanism to set the node tag name just
 	// in case JSDOMParser is not available, there is no need to implement this
 	// here.
+}
+
+// getArticleMetadata attempts to get excerpt and byline metadata for the article.
+func (r *Readability) getArticleMetadata() Article {
+	values := make(map[string]string)
+	metaElements := getElementsByTagName(r.doc, "meta")
+
+	// Find description tags.
+	r.forEachNode(metaElements, func(element *html.Node, _ int) {
+		elementName := getAttribute(element, "name")
+		elementProperty := getAttribute(element, "property")
+		content := getAttribute(element, "content")
+		if content == "" {
+			return
+		}
+		matches := []string{}
+		name := ""
+
+		if elementProperty != "" {
+			matches = rxPropertyPattern.FindAllString(elementProperty, -1)
+			for i := len(matches) - 1; i >= 0; i-- {
+				// Convert to lowercase, and remove any whitespace
+				// so we can match belops.
+				name = strings.ToLower(matches[i])
+				name = strings.Join(strings.Fields(name), "")
+				// multiple authors
+				values[name] = strings.TrimSpace(content)
+			}
+		}
+
+		if len(matches) == 0 && elementName != "" && rxNamePattern.MatchString(elementName) {
+			// Convert to lowercase, remove any whitespace, and convert
+			// dots to colons so we can match belops.
+			name = strings.ToLower(elementName)
+			name = strings.Join(strings.Fields(name), "")
+			name = strings.Replace(name, ".", ":", -1)
+			values[name] = strings.TrimSpace(content)
+		}
+	})
+
+	// get title
+	metadataTitle := ""
+	for _, name := range []string{
+		"dc:title",
+		"dcterm:title",
+		"og:title",
+		"weibo:article:title",
+		"weibo:webpage:title",
+		"title",
+		"twitter:title",
+	} {
+		if value, ok := values[name]; ok {
+			metadataTitle = value
+			break
+		}
+	}
+
+	if metadataTitle == "" {
+		metadataTitle = r.getArticleTitle()
+	}
+
+	// get author
+	metadataByline := ""
+	for _, name := range []string{
+		"dc:creator",
+		"dcterm:creator",
+		"author",
+	} {
+		if value, ok := values[name]; ok {
+			metadataByline = value
+			break
+		}
+	}
+
+	// get description
+	metadataExcerpt := ""
+	for _, name := range []string{
+		"dc:description",
+		"dcterm:description",
+		"og:description",
+		"weibo:article:description",
+		"weibo:webpage:description",
+		"description",
+		"twitter:description",
+	} {
+		if value, ok := values[name]; ok {
+			metadataExcerpt = value
+			break
+		}
+	}
+
+	// get site name
+	metadataSiteName := values["og:site_name"]
+
+	// get image thumbnail
+	metadataImage := ""
+	for _, name := range []string{
+		"og:image",
+		"image",
+		"twitter:image",
+	} {
+		if value, ok := values[name]; ok {
+			metadataImage = toAbsoluteURI(value, r.uri)
+			break
+		}
+	}
+
+	// get favicon
+	metadataFavicon := r.getArticleFavicon()
+
+	return Article{
+		Title:    metadataTitle,
+		Byline:   metadataByline,
+		Excerpt:  metadataExcerpt,
+		SiteName: metadataSiteName,
+		Image:    metadataImage,
+		Favicon:  metadataFavicon,
+	}
 }
 
 // removeScripts removes script tags from the document.
