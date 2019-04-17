@@ -100,6 +100,17 @@ func getAttribute(node *html.Node, attrName string) string {
 	return ""
 }
 
+// documentElement returns the root element of the document.
+func documentElement(doc *html.Node) *html.Node {
+	nodes := getElementsByTagName(doc, "html")
+
+	if len(nodes) > 0 {
+		return nodes[0]
+	}
+
+	return nil
+}
+
 // wordCount returns number of word in str.
 func wordCount(str string) int {
 	return len(strings.Fields(str))
