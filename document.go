@@ -111,6 +111,14 @@ func documentElement(doc *html.Node) *html.Node {
 	return nil
 }
 
+// className returns the value of the class attribute of the element.
+func className(node *html.Node) string {
+	className := getAttribute(node, "class")
+	className = strings.TrimSpace(className)
+	className = rxNormalize.ReplaceAllString(className, "\x20")
+	return className
+}
+
 // wordCount returns number of word in str.
 func wordCount(str string) int {
 	return len(strings.Fields(str))
