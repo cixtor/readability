@@ -119,6 +119,13 @@ func className(node *html.Node) string {
 	return className
 }
 
+// id returns the value of the id attribute of the specified element.
+func id(node *html.Node) string {
+	id := getAttribute(node, "id")
+	id = strings.TrimSpace(id)
+	return id
+}
+
 // wordCount returns number of word in str.
 func wordCount(str string) int {
 	return len(strings.Fields(str))
