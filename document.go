@@ -100,6 +100,18 @@ func getAttribute(node *html.Node, attrName string) string {
 	return ""
 }
 
+// hasAttribute returns a Boolean value indicating whether the specified node
+// has the specified attribute or not.
+func hasAttribute(node *html.Node, attrName string) bool {
+	for i := 0; i < len(node.Attr); i++ {
+		if node.Attr[i].Key == attrName {
+			return true
+		}
+	}
+
+	return false
+}
+
 // documentElement returns the root element of the document.
 func documentElement(doc *html.Node) *html.Node {
 	nodes := getElementsByTagName(doc, "html")
