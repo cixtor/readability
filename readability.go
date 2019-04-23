@@ -22,6 +22,7 @@ var rxTitleHierarchySep = regexp.MustCompile(`(?i) [\\/>»] `)
 var rxTitleRemoveFinalPart = regexp.MustCompile(`(?i)(.*)[\|\-\\/>»] .*`)
 var rxTitleRemove1stPart = regexp.MustCompile(`(?i)[^\|\-\\/>»]*[\|\-\\/>»](.*)`)
 var rxTitleAnySeparator = regexp.MustCompile(`(?i)[\|\-\\/>»]+`)
+var rxDisplayNone = regexp.MustCompile(`(?i)display\s*:\s*none`)
 var rxFaviconSize = regexp.MustCompile(`(?i)(\d+)x(\d+)`)
 
 // The commented out elements qualify as phrasing content but tend to be
@@ -575,6 +576,13 @@ func (r *Readability) getInnerText(node *html.Node, normalizeSpaces bool) string
 	}
 
 	return textContent
+}
+
+// isProbablyVisible determines if a node is visible.
+func (r *Readability) isProbablyVisible(node *html.Node) bool {
+	style := getAttribute(node, "style")
+	noStyle := (style == "" || !rxDisplayNone.MatchString(style))
+	return noStyle && !hasAttribute(node, "hidden")
 }
 
 // Parse runs readability.
