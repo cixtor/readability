@@ -8,6 +8,18 @@ import (
 	"golang.org/x/net/html"
 )
 
+// firstElementChild returns the object's first child Element, or nil if there
+// are no child elements.
+func firstElementChild(node *html.Node) *html.Node {
+	for child := node.FirstChild; child != nil; child = child.NextSibling {
+		if child.Type == html.ElementNode {
+			return child
+		}
+	}
+
+	return nil
+}
+
 // appendChild adds a node to the end of the list of children of a specified
 // parent node. If the given child is a reference to an existing node in the
 // document, appendChild moves it from its current position to the new position
