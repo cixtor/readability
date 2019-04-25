@@ -20,6 +20,19 @@ func firstElementChild(node *html.Node) *html.Node {
 	return nil
 }
 
+// nextElementSibling returns the Element immediately following the specified
+// one in its parent's children list, or nil if the specified Element is the
+// last one in the list.
+func nextElementSibling(node *html.Node) *html.Node {
+	for sibling := node.NextSibling; sibling != nil; sibling = sibling.NextSibling {
+		if sibling.Type == html.ElementNode {
+			return sibling
+		}
+	}
+
+	return nil
+}
+
 // appendChild adds a node to the end of the list of children of a specified
 // parent node. If the given child is a reference to an existing node in the
 // document, appendChild moves it from its current position to the new position
