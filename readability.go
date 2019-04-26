@@ -533,6 +533,40 @@ func (r *Readability) getArticleMetadata() Article {
 	}
 }
 
+// getNextNode traverses the DOM from node to node, starting at the node passed
+// in. Pass true for the second parameter to indicate this node itself (and its
+// kids) are going away, and we want the next node over. Calling this in a loop
+// will traverse the DOM depth-first.
+//
+// In Readability.js, ignoreSelfAndKids default to false.
+func (r *Readability) getNextNode(node *html.Node, ignoreSelfAndKids bool) *html.Node {
+	// First check for kids if those are not being ignored
+	if firstChild := firstElementChild(node); !ignoreSelfAndKids && firstChild != nil {
+		return firstChild
+	}
+
+	// Then for siblings...
+	if sibling := nextElementSibling(node); sibling != nil {
+		return sibling
+	}
+
+	// And finally, move up the parent chain *and* find a sibling
+	// (because this is depth-first traversal, we will have already
+	// seen the parent nodes themselves).
+	for {
+		node = node.Parent
+		if node == nil || nextElementSibling(node) != nil {
+			break
+		}
+	}
+
+	if node != nil {
+		return nextElementSibling(node)
+	}
+
+	return nil
+}
+
 // removeScripts removes script tags from the document.
 func (r *Readability) removeScripts(doc *html.Node) {
 	r.removeNodes(getElementsByTagName(doc, "script"), nil)
