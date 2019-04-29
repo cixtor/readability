@@ -533,6 +533,17 @@ func (r *Readability) getArticleMetadata() Article {
 	}
 }
 
+// removeAndGetNext remove node and returns its next node.
+func (r *Readability) removeAndGetNext(node *html.Node) *html.Node {
+	nextNode := r.getNextNode(node, true)
+
+	if node.Parent != nil {
+		node.Parent.RemoveChild(node)
+	}
+
+	return nextNode
+}
+
 // getNextNode traverses the DOM from node to node, starting at the node passed
 // in. Pass true for the second parameter to indicate this node itself (and its
 // kids) are going away, and we want the next node over. Calling this in a loop
