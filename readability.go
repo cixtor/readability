@@ -37,8 +37,8 @@ var phrasingElems = []string{
 }
 
 type Readability struct {
-	doc *html.Node
-	uri *url.URL
+	doc         *html.Node
+	documentURI *url.URL
 
 	// MaxElemsToParse is the optional maximum number of HTML nodes to parse
 	// from the document. If the number of elements in the document is higher
@@ -93,7 +93,7 @@ func New(reader io.Reader, rawurl string) (Readability, error) {
 	var err error
 	var r Readability
 
-	if r.uri, err = url.ParseRequestURI(rawurl); err != nil {
+	if r.documentURI, err = url.ParseRequestURI(rawurl); err != nil {
 		return Readability{}, fmt.Errorf("url.ParseRequestURI %s", err)
 	}
 
@@ -300,7 +300,7 @@ func (r *Readability) getArticleFavicon() string {
 		}
 	})
 
-	return toAbsoluteURI(favicon, r.uri)
+	return toAbsoluteURI(favicon, r.documentURI)
 }
 
 // prepDocument prepares the HTML document for readability to scrape it. This
@@ -515,7 +515,7 @@ func (r *Readability) getArticleMetadata() Article {
 		"twitter:image",
 	} {
 		if value, ok := values[name]; ok {
-			metadataImage = toAbsoluteURI(value, r.uri)
+			metadataImage = toAbsoluteURI(value, r.documentURI)
 			break
 		}
 	}
