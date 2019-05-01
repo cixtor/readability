@@ -578,6 +578,12 @@ func (r *Readability) getNextNode(node *html.Node, ignoreSelfAndKids bool) *html
 	return nil
 }
 
+// isValidByline checks whether the input string could be a byline.
+func (r *Readability) isValidByline(byline string) bool {
+	byline = strings.TrimSpace(byline)
+	return len(byline) > 0 && len(byline) < 100
+}
+
 // removeScripts removes script tags from the document.
 func (r *Readability) removeScripts(doc *html.Node) {
 	r.removeNodes(getElementsByTagName(doc, "script"), nil)
