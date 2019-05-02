@@ -13,6 +13,7 @@ import (
 
 // All of the regular expressions in use within readability.
 // Defined up here so we don't instantiate them repeatedly in loops.
+var rxByline = regexp.MustCompile(`(?i)byline|author|dateline|writtenby|p-author`)
 var rxNormalize = regexp.MustCompile(`(?i)\s{2,}`)
 var rxWhitespace = regexp.MustCompile(`(?i)^\s*$`)
 var rxPropertyPattern = regexp.MustCompile(`(?i)\s*(dc|dcterm|og|twitter)\s*:\s*(author|creator|description|title|site_name|image\S*)\s*`)
@@ -37,8 +38,9 @@ var phrasingElems = []string{
 }
 
 type Readability struct {
-	doc         *html.Node
-	documentURI *url.URL
+	doc           *html.Node
+	documentURI   *url.URL
+	articleByline string
 
 	// MaxElemsToParse is the optional maximum number of HTML nodes to parse
 	// from the document. If the number of elements in the document is higher
@@ -582,6 +584,25 @@ func (r *Readability) getNextNode(node *html.Node, ignoreSelfAndKids bool) *html
 func (r *Readability) isValidByline(byline string) bool {
 	byline = strings.TrimSpace(byline)
 	return len(byline) > 0 && len(byline) < 100
+}
+
+// checkByline determines if a node is used as byline.
+func (r *Readability) checkByline(node *html.Node, matchString string) bool {
+	if r.articleByline != "" {
+		return false
+	}
+
+	rel := getAttribute(node, "rel")
+	itemprop := getAttribute(node, "itemprop")
+	nodeText := textContent(node)
+	if (rel == "author" || strings.Contains(itemprop, "author") || rxByline.MatchString(matchString)) && r.isValidByline(nodeText) {
+		nodeText = strings.TrimSpace(nodeText)
+		nodeText = strings.Join(strings.Fields(nodeText), "\x20")
+		r.articleByline = nodeText
+		return true
+	}
+
+	return false
 }
 
 // removeScripts removes script tags from the document.
