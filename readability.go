@@ -650,6 +650,30 @@ func (r *Readability) getInnerText(node *html.Node, normalizeSpaces bool) string
 	return textContent
 }
 
+// hasAncestorTag checks if a given node has one of its ancestor tag name
+// matching the provided one.
+//
+// In Readability.js, default value for maxDepth is 3.
+func (r *Readability) hasAncestorTag(node *html.Node, tag string, maxDepth int, filterFn func(*html.Node) bool) bool {
+	depth := 0
+
+	for node.Parent != nil {
+		if maxDepth > 0 && depth > maxDepth {
+			return false
+		}
+
+		if tagName(node.Parent) == tag && (filterFn == nil || filterFn(node.Parent)) {
+			return true
+		}
+
+		node = node.Parent
+
+		depth++
+	}
+
+	return false
+}
+
 // isProbablyVisible determines if a node is visible.
 func (r *Readability) isProbablyVisible(node *html.Node) bool {
 	style := getAttribute(node, "style")
