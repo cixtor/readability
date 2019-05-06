@@ -163,6 +163,23 @@ func id(node *html.Node) string {
 	return id
 }
 
+// children returns an HTMLCollection of the child elements of Node.
+func children(node *html.Node) []*html.Node {
+	var children []*html.Node
+
+	if node == nil {
+		return nil
+	}
+
+	for child := node.FirstChild; child != nil; child = child.NextSibling {
+		if child.Type == html.ElementNode {
+			children = append(children, child)
+		}
+	}
+
+	return children
+}
+
 // wordCount returns number of word in str.
 func wordCount(str string) int {
 	return len(strings.Fields(str))
