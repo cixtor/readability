@@ -611,6 +611,19 @@ func (r *Readability) removeScripts(doc *html.Node) {
 	r.removeNodes(getElementsByTagName(doc, "noscript"), nil)
 }
 
+// isElementWithoutContent determines if node is empty. A node is considered
+// empty is there is nothing inside or if the only things inside are HTML break
+// tags <br> and HTML horizontal rule tags <hr>.
+func (r *Readability) isElementWithoutContent(node *html.Node) bool {
+	brs := getElementsByTagName(node, "br")
+	hrs := getElementsByTagName(node, "hr")
+	childs := children(node)
+
+	return node.Type == html.ElementNode &&
+		strings.TrimSpace(textContent(node)) == "" &&
+		(len(childs) == 0 || len(childs) == len(brs)+len(hrs))
+}
+
 // isPhrasingContent determines if a node qualifies as phrasing content.
 //
 // See: https://developer.mozilla.org/en-US/docs/Web/Guide/HTML/Content_categories#Phrasing_content
