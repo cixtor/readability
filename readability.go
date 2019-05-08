@@ -16,6 +16,7 @@ import (
 var rxByline = regexp.MustCompile(`(?i)byline|author|dateline|writtenby|p-author`)
 var rxNormalize = regexp.MustCompile(`(?i)\s{2,}`)
 var rxWhitespace = regexp.MustCompile(`(?i)^\s*$`)
+var rxHasContent = regexp.MustCompile(`(?i)\S$`)
 var rxPropertyPattern = regexp.MustCompile(`(?i)\s*(dc|dcterm|og|twitter)\s*:\s*(author|creator|description|title|site_name|image\S*)\s*`)
 var rxNamePattern = regexp.MustCompile(`(?i)^\s*(?:(dc|dcterm|og|twitter|weibo:(article|webpage))\s*[\.:]\s*)?(author|creator|description|title|site_name|image)\s*$`)
 var rxTitleSeparator = regexp.MustCompile(`(?i) [\|\-\\/>»] `)
@@ -609,6 +610,21 @@ func (r *Readability) checkByline(node *html.Node, matchString string) bool {
 func (r *Readability) removeScripts(doc *html.Node) {
 	r.removeNodes(getElementsByTagName(doc, "script"), nil)
 	r.removeNodes(getElementsByTagName(doc, "noscript"), nil)
+}
+
+// hasSingleTagInsideElement check if the node has only whitespace and a single
+// element with given tag. Returns false if the DIV Node contains non-empty text
+// nodes or if it contains no element with given tag or more than 1 element.
+func (r *Readability) hasSingleTagInsideElement(element *html.Node, tag string) bool {
+	// There should be exactly 1 element child with given tag
+	if childs := children(element); len(childs) != 1 || tagName(childs[0]) != tag {
+		return false
+	}
+
+	// And there should be no text nodes with real content
+	return !r.someNode(childNodes(element), func(node *html.Node) bool {
+		return node.Type == html.TextNode && rxHasContent.MatchString(textContent(node))
+	})
 }
 
 // isElementWithoutContent determines if node is empty. A node is considered
