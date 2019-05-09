@@ -679,6 +679,25 @@ func (r *Readability) getInnerText(node *html.Node, normalizeSpaces bool) string
 	return textContent
 }
 
+// getLinkDensity gets the density of links as a percentage of the content.
+// This is the amount of text that is inside a link divided by the total text
+// in the node.
+func (r *Readability) getLinkDensity(element *html.Node) float64 {
+	textLength := len(r.getInnerText(element, true))
+
+	if textLength == 0 {
+		return 0
+	}
+
+	linkLength := 0
+
+	r.forEachNode(getElementsByTagName(element, "a"), func(linkNode *html.Node, _ int) {
+		linkLength += len(r.getInnerText(linkNode, true))
+	})
+
+	return float64(linkLength) / float64(textLength)
+}
+
 // hasAncestorTag checks if a given node has one of its ancestor tag name
 // matching the provided one.
 //
