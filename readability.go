@@ -27,6 +27,12 @@ var rxTitleAnySeparator = regexp.MustCompile(`(?i)[\|\-\\/>»]+`)
 var rxDisplayNone = regexp.MustCompile(`(?i)display\s*:\s*none`)
 var rxFaviconSize = regexp.MustCompile(`(?i)(\d+)x(\d+)`)
 
+// divToPElems is a list of HTML tag names representing content dividers.
+var divToPElems = []string{
+	"a", "blockquote", "div", "dl", "img",
+	"ol", "p", "pre", "select", "table", "ul",
+}
+
 // The commented out elements qualify as phrasing content but tend to be
 // removed by readability when put into paragraphs, so we ignore them here.
 var phrasingElems = []string{
@@ -638,6 +644,15 @@ func (r *Readability) isElementWithoutContent(node *html.Node) bool {
 	return node.Type == html.ElementNode &&
 		strings.TrimSpace(textContent(node)) == "" &&
 		(len(childs) == 0 || len(childs) == len(brs)+len(hrs))
+}
+
+// hasChildBlockElement determines whether element has any children block level
+// elements.
+func (r *Readability) hasChildBlockElement(element *html.Node) bool {
+	return r.someNode(childNodes(element), func(node *html.Node) bool {
+		return indexOf(divToPElems, tagName(node)) != -1 ||
+			r.hasChildBlockElement(node)
+	})
 }
 
 // isPhrasingContent determines if a node qualifies as phrasing content.
