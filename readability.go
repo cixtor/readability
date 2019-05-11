@@ -612,6 +612,27 @@ func (r *Readability) checkByline(node *html.Node, matchString string) bool {
 	return false
 }
 
+// getNodeAncestors gets the node's direct parent and grandparents.
+//
+// In Readability.js, maxDepth default to 0.
+func (r *Readability) getNodeAncestors(node *html.Node, maxDepth int) []*html.Node {
+	level := 0
+	ancestors := []*html.Node{}
+
+	for node.Parent != nil {
+		level++
+		ancestors = append(ancestors, node.Parent)
+
+		if maxDepth > 0 && level == maxDepth {
+			break
+		}
+
+		node = node.Parent
+	}
+
+	return ancestors
+}
+
 // removeScripts removes script tags from the document.
 func (r *Readability) removeScripts(doc *html.Node) {
 	r.removeNodes(getElementsByTagName(doc, "script"), nil)
