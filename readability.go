@@ -633,6 +633,11 @@ func (r *Readability) getNodeAncestors(node *html.Node, maxDepth int) []*html.No
 	return ancestors
 }
 
+// hasContentScore checks if node has readability score.
+func (r *Readability) hasContentScore(node *html.Node) bool {
+	return hasAttribute(node, "data-readability-score")
+}
+
 // removeScripts removes script tags from the document.
 func (r *Readability) removeScripts(doc *html.Node) {
 	r.removeNodes(getElementsByTagName(doc, "script"), nil)
