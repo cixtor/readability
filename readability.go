@@ -13,6 +13,8 @@ import (
 
 // All of the regular expressions in use within readability.
 // Defined up here so we don't instantiate them repeatedly in loops.
+var rxPositive = regexp.MustCompile(`(?i)article|body|content|entry|hentry|h-entry|main|page|pagination|post|text|blog|story`)
+var rxNegative = regexp.MustCompile(`(?i)hidden|^hid$| hid$| hid |^hid |banner|combx|comment|com-|contact|foot|footer|footnote|gdpr|masthead|media|meta|outbrain|promo|related|scroll|share|shoutbox|sidebar|skyscraper|sponsor|shopping|tags|tool|widget`)
 var rxByline = regexp.MustCompile(`(?i)byline|author|dateline|writtenby|p-author`)
 var rxNormalize = regexp.MustCompile(`(?i)\s{2,}`)
 var rxWhitespace = regexp.MustCompile(`(?i)^\s*$`)
@@ -44,10 +46,16 @@ var phrasingElems = []string{
 	"sup", "textarea", "time", "var", "wbr",
 }
 
+// flags is flags that used by parser.
+type flags struct {
+	useWeightClasses   bool
+}
+
 type Readability struct {
 	doc           *html.Node
 	documentURI   *url.URL
 	articleByline string
+	flags         flags
 
 	// MaxElemsToParse is the optional maximum number of HTML nodes to parse
 	// from the document. If the number of elements in the document is higher
@@ -737,6 +745,40 @@ func (r *Readability) getLinkDensity(element *html.Node) float64 {
 	})
 
 	return float64(linkLength) / float64(textLength)
+}
+
+// getClassWeight gets an elements class/id weight. Uses regular expressions to
+// tell if this element looks good or bad.
+func (r *Readability) getClassWeight(node *html.Node) int {
+	if !r.flags.useWeightClasses {
+		return 0
+	}
+
+	weight := 0
+
+	// Look for a special classname
+	if nodeClassName := className(node); nodeClassName != "" {
+		if rxNegative.MatchString(nodeClassName) {
+			weight -= 25
+		}
+
+		if rxPositive.MatchString(nodeClassName) {
+			weight += 25
+		}
+	}
+
+	// Look for a special ID
+	if nodeID := id(node); nodeID != "" {
+		if rxNegative.MatchString(nodeID) {
+			weight -= 25
+		}
+
+		if rxPositive.MatchString(nodeID) {
+			weight += 25
+		}
+	}
+
+	return weight
 }
 
 // hasAncestorTag checks if a given node has one of its ancestor tag name
