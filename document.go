@@ -125,6 +125,29 @@ func getAttribute(node *html.Node, attrName string) string {
 	return ""
 }
 
+// setAttribute sets attribute for node. If attribute already exists, it will
+// be replaced.
+func setAttribute(node *html.Node, attrName string, attrValue string) {
+	attrIdx := -1
+
+	for i := 0; i < len(node.Attr); i++ {
+		if node.Attr[i].Key == attrName {
+			attrIdx = i
+			break
+		}
+	}
+
+	if attrIdx >= 0 {
+		node.Attr[attrIdx].Val = attrValue
+		return
+	}
+
+	node.Attr = append(node.Attr, html.Attribute{
+		Key: attrName,
+		Val: attrValue,
+	})
+}
+
 // hasAttribute returns a Boolean value indicating whether the specified node
 // has the specified attribute or not.
 func hasAttribute(node *html.Node, attrName string) bool {
