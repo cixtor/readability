@@ -641,6 +641,11 @@ func (r *Readability) getNodeAncestors(node *html.Node, maxDepth int) []*html.No
 	return ancestors
 }
 
+// setContentScore sets the readability score for a node.
+func (r *Readability) setContentScore(node *html.Node, score float64) {
+	setAttribute(node, "data-readability-score", fmt.Sprintf("%.4f", score))
+}
+
 // hasContentScore checks if node has readability score.
 func (r *Readability) hasContentScore(node *html.Node) bool {
 	return hasAttribute(node, "data-readability-score")
