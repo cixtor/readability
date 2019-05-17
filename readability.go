@@ -550,6 +550,25 @@ func (r *Readability) getArticleMetadata() Article {
 	}
 }
 
+// initializeNode initializes a node with the readability score. Also checks
+// the className/id for special names to add to its score.
+func (r *Readability) initializeNode(node *html.Node) {
+	contentScore := float64(r.getClassWeight(node))
+
+	switch tagName(node) {
+	case "div":
+		contentScore += 5
+	case "pre", "td", "blockquote":
+		contentScore += 3
+	case "address", "ol", "ul", "dl", "dd", "dt", "li", "form":
+		contentScore -= 3
+	case "h1", "h2", "h3", "h4", "h5", "h6", "th":
+		contentScore -= 5
+	}
+
+	r.setContentScore(node, contentScore)
+}
+
 // removeAndGetNext remove node and returns its next node.
 func (r *Readability) removeAndGetNext(node *html.Node) *html.Node {
 	nextNode := r.getNextNode(node, true)
