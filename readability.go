@@ -670,6 +670,24 @@ func (r *Readability) hasContentScore(node *html.Node) bool {
 	return hasAttribute(node, "data-readability-score")
 }
 
+// getContentScore gets the readability score of a node.
+func (r *Readability) getContentScore(node *html.Node) float64 {
+	strScore := getAttribute(node, "data-readability-score")
+	strScore = strings.TrimSpace(strScore)
+
+	if strScore == "" {
+		return 0
+	}
+
+	score, err := strconv.ParseFloat(strScore, 64)
+
+	if err != nil {
+		return 0
+	}
+
+	return score
+}
+
 // removeScripts removes script tags from the document.
 func (r *Readability) removeScripts(doc *html.Node) {
 	r.removeNodes(getElementsByTagName(doc, "script"), nil)
