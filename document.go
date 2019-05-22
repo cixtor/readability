@@ -62,6 +62,17 @@ func childNodes(node *html.Node) []*html.Node {
 	return list
 }
 
+// includeNode determines if node is included inside nodeList.
+func includeNode(nodeList []*html.Node, node *html.Node) bool {
+	for i := 0; i < len(nodeList); i++ {
+		if nodeList[i] == node {
+			return true
+		}
+	}
+
+	return false
+}
+
 // cloneNode returns a duplicate of the node on which this method was called.
 //
 // See: https://developer.mozilla.org/en-US/docs/Web/API/Node/cloneNode
