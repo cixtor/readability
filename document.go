@@ -159,6 +159,24 @@ func setAttribute(node *html.Node, attrName string, attrValue string) {
 	})
 }
 
+// removeAttribute removes attribute with given name.
+func removeAttribute(node *html.Node, attrName string) {
+	attrIdx := -1
+
+	for i := 0; i < len(node.Attr); i++ {
+		if node.Attr[i].Key == attrName {
+			attrIdx = i
+			break
+		}
+	}
+
+	if attrIdx >= 0 {
+		a := node.Attr
+		a = append(a[:attrIdx], a[attrIdx+1:]...)
+		node.Attr = a
+	}
+}
+
 // hasAttribute returns a Boolean value indicating whether the specified node
 // has the specified attribute or not.
 func hasAttribute(node *html.Node, attrName string) bool {
