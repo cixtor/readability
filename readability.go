@@ -35,6 +35,33 @@ var divToPElems = []string{
 	"ol", "p", "pre", "select", "table", "ul",
 }
 
+// presentationalAttributes is a list of HTML attributes used to style Nodes.
+var presentationalAttributes = []string{
+	"align",
+	"background",
+	"bgcolor",
+	"border",
+	"cellpadding",
+	"cellspacing",
+	"frame",
+	"hspace",
+	"rules",
+	"style",
+	"valign",
+	"vspace",
+}
+
+// deprecatedSizeAttributeElems is a list of HTML tags that allow programmers
+// to set Width and Height attributes to define their own size but that have
+// already been deprecated in recent HTML specifications.
+var deprecatedSizeAttributeElems = []string{
+	"table",
+	"th",
+	"td",
+	"hr",
+	"pre",
+}
+
 // The commented out elements qualify as phrasing content but tend to be
 // removed by readability when put into paragraphs, so we ignore them here.
 var phrasingElems = []string{
@@ -768,6 +795,29 @@ func (r *Readability) getInnerText(node *html.Node, normalizeSpaces bool) string
 	}
 
 	return textContent
+}
+
+// cleanStyles removes the style attribute on every node and under.
+func (r *Readability) cleanStyles(node *html.Node) {
+	nodeTagName := tagName(node)
+
+	if node == nil || nodeTagName == "svg" {
+		return
+	}
+
+	// Remove `style` and deprecated presentational attributes
+	for i := 0; i < len(presentationalAttributes); i++ {
+		removeAttribute(node, presentationalAttributes[i])
+	}
+
+	if indexOf(deprecatedSizeAttributeElems, nodeTagName) != -1 {
+		removeAttribute(node, "width")
+		removeAttribute(node, "height")
+	}
+
+	for child := firstElementChild(node); child != nil; child = nextElementSibling(child) {
+		r.cleanStyles(child)
+	}
 }
 
 // getLinkDensity gets the density of links as a percentage of the content.
