@@ -897,6 +897,16 @@ func (r *Readability) hasAncestorTag(node *html.Node, tag string, maxDepth int, 
 	return false
 }
 
+// setReadabilityDataTable marks whether a Node is data table or not.
+func (r *Readability) setReadabilityDataTable(node *html.Node, isDataTable bool) {
+	if isDataTable {
+		setAttribute(node, "data-readability-table", "true")
+		return
+	}
+
+	removeAttribute(node, "data-readability-table")
+}
+
 // isProbablyVisible determines if a node is visible.
 func (r *Readability) isProbablyVisible(node *html.Node) bool {
 	style := getAttribute(node, "style")
