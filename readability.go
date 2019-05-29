@@ -897,6 +897,45 @@ func (r *Readability) hasAncestorTag(node *html.Node, tag string, maxDepth int, 
 	return false
 }
 
+// getRowAndColumnCount returns how many rows and columns this table has.
+func (r *Readability) getRowAndColumnCount(table *html.Node) (int, int) {
+	rows := 0
+	columns := 0
+	trs := getElementsByTagName(table, "tr")
+
+	for i := 0; i < len(trs); i++ {
+		strRowSpan := getAttribute(trs[i], "rowspan")
+		rowSpan, _ := strconv.Atoi(strRowSpan)
+
+		if rowSpan == 0 {
+			rowSpan = 1
+		}
+
+		rows += rowSpan
+
+		// Now look for column-related info
+		columnsInThisRow := 0
+		cells := getElementsByTagName(trs[i], "td")
+
+		for j := 0; j < len(cells); j++ {
+			strColSpan := getAttribute(cells[j], "colspan")
+			colSpan, _ := strconv.Atoi(strColSpan)
+
+			if colSpan == 0 {
+				colSpan = 1
+			}
+
+			columnsInThisRow += colSpan
+		}
+
+		if columnsInThisRow > columns {
+			columns = columnsInThisRow
+		}
+	}
+
+	return rows, columns
+}
+
 // setReadabilityDataTable marks whether a Node is data table or not.
 func (r *Readability) setReadabilityDataTable(node *html.Node, isDataTable bool) {
 	if isDataTable {
