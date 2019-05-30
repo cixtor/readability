@@ -946,6 +946,72 @@ func (r *Readability) setReadabilityDataTable(node *html.Node, isDataTable bool)
 	removeAttribute(node, "data-readability-table")
 }
 
+// markDataTables looks for "data" (as opposed to "layout") tables and mark it.
+func (r *Readability) markDataTables(root *html.Node) {
+	tables := getElementsByTagName(root, "table")
+
+	for i := 0; i < len(tables); i++ {
+		table := tables[i]
+
+		role := getAttribute(table, "role")
+		if role == "presentation" {
+			r.setReadabilityDataTable(table, false)
+			continue
+		}
+
+		datatable := getAttribute(table, "datatable")
+		if datatable == "0" {
+			r.setReadabilityDataTable(table, false)
+			continue
+		}
+
+		if hasAttribute(table, "summary") {
+			r.setReadabilityDataTable(table, true)
+			continue
+		}
+
+		if captions := getElementsByTagName(table, "caption"); len(captions) > 0 {
+			if caption := captions[0]; caption != nil && len(childNodes(caption)) > 0 {
+				r.setReadabilityDataTable(table, true)
+				continue
+			}
+		}
+
+		// If the table has a descendant with any of these tags, consider a data table:
+		hasDataTableDescendantTags := false
+		for _, descendantTag := range []string{"col", "colgroup", "tfoot", "thead", "th"} {
+			descendants := getElementsByTagName(table, descendantTag)
+			if len(descendants) > 0 && descendants[0] != nil {
+				hasDataTableDescendantTags = true
+				break
+			}
+		}
+
+		if hasDataTableDescendantTags {
+			r.setReadabilityDataTable(table, true)
+			continue
+		}
+
+		// Nested tables indicates a layout table:
+		if len(getElementsByTagName(table, "table")) > 0 {
+			r.setReadabilityDataTable(table, false)
+			continue
+		}
+
+		rows, columns := r.getRowAndColumnCount(table)
+
+		if rows >= 10 || columns > 4 {
+			r.setReadabilityDataTable(table, true)
+			continue
+		}
+
+		// Now just go by size entirely:
+		if rows*columns > 10 {
+			r.setReadabilityDataTable(table, true)
+		}
+	}
+}
+
 // isProbablyVisible determines if a node is visible.
 func (r *Readability) isProbablyVisible(node *html.Node) bool {
 	style := getAttribute(node, "style")
