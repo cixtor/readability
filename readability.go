@@ -936,6 +936,11 @@ func (r *Readability) getRowAndColumnCount(table *html.Node) (int, int) {
 	return rows, columns
 }
 
+// isReadabilityDataTable determines if node is data table.
+func (r *Readability) isReadabilityDataTable(node *html.Node) bool {
+	return hasAttribute(node, "data-readability-table")
+}
+
 // setReadabilityDataTable marks whether a Node is data table or not.
 func (r *Readability) setReadabilityDataTable(node *html.Node, isDataTable bool) {
 	if isDataTable {
