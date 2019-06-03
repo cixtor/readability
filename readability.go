@@ -797,6 +797,12 @@ func (r *Readability) getInnerText(node *html.Node, normalizeSpaces bool) string
 	return textContent
 }
 
+// getCharCount returns the number of times a string appears in the Node.
+func (r *Readability) getCharCount(node *html.Node, s string) int {
+	innerText := r.getInnerText(node, true)
+	return strings.Count(innerText, s)
+}
+
 // cleanStyles removes the style attribute on every node and under.
 func (r *Readability) cleanStyles(node *html.Node) {
 	nodeTagName := tagName(node)
@@ -936,7 +942,7 @@ func (r *Readability) getRowAndColumnCount(table *html.Node) (int, int) {
 	return rows, columns
 }
 
-// isReadabilityDataTable determines if node is data table.
+// isReadabilityDataTable determines if a Node is a data table.
 func (r *Readability) isReadabilityDataTable(node *html.Node) bool {
 	return hasAttribute(node, "data-readability-table")
 }
