@@ -189,6 +189,20 @@ func hasAttribute(node *html.Node, attrName string) bool {
 	return false
 }
 
+// innerHTML returns the HTML content (inner HTML) of an element.
+func innerHTML(node *html.Node) string {
+	var err error
+	var buffer bytes.Buffer
+
+	for child := node.FirstChild; child != nil; child = child.NextSibling {
+		if err = html.Render(&buffer, child); err != nil {
+			return ""
+		}
+	}
+
+	return strings.TrimSpace(buffer.String())
+}
+
 // documentElement returns the root element of the document.
 func documentElement(doc *html.Node) *html.Node {
 	nodes := getElementsByTagName(doc, "html")
