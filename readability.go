@@ -17,6 +17,7 @@ var rxPositive = regexp.MustCompile(`(?i)article|body|content|entry|hentry|h-ent
 var rxNegative = regexp.MustCompile(`(?i)hidden|^hid$| hid$| hid |^hid |banner|combx|comment|com-|contact|foot|footer|footnote|gdpr|masthead|media|meta|outbrain|promo|related|scroll|share|shoutbox|sidebar|skyscraper|sponsor|shopping|tags|tool|widget`)
 var rxByline = regexp.MustCompile(`(?i)byline|author|dateline|writtenby|p-author`)
 var rxNormalize = regexp.MustCompile(`(?i)\s{2,}`)
+var rxVideos = regexp.MustCompile(`(?i)//(www\.)?((dailymotion|youtube|youtube-nocookie|player\.vimeo|v\.qq)\.com|(archive|upload\.wikimedia)\.org|player\.twitch\.tv)`)
 var rxWhitespace = regexp.MustCompile(`(?i)^\s*$`)
 var rxHasContent = regexp.MustCompile(`(?i)\S$`)
 var rxPropertyPattern = regexp.MustCompile(`(?i)\s*(dc|dcterm|og|twitter)\s*:\s*(author|creator|description|title|site_name|image\S*)\s*`)
@@ -76,6 +77,7 @@ var phrasingElems = []string{
 // flags is flags that used by parser.
 type flags struct {
 	useWeightClasses   bool
+	cleanConditionally bool
 }
 
 type Readability struct {
@@ -1021,6 +1023,81 @@ func (r *Readability) markDataTables(root *html.Node) {
 			r.setReadabilityDataTable(table, true)
 		}
 	}
+}
+
+// cleanConditionally cleans an element of all tags of type "tag" if they look
+// fishy. "Fishy" is an algorithm based on content length, classnames, link
+// density, number of images & embeds, etc.
+func (r *Readability) cleanConditionally(element *html.Node, tag string) {
+	if !r.flags.cleanConditionally {
+		return
+	}
+
+	isList := tag == "ul" || tag == "ol"
+
+	// Gather counts for other typical elements embedded within. Traverse
+	// backwards so we can remove nodes at the same time without effecting
+	// the traversal.
+	r.removeNodes(getElementsByTagName(element, tag), func(node *html.Node) bool {
+		if tag == "table" && r.isReadabilityDataTable(node) {
+			return false
+		}
+
+		if r.hasAncestorTag(node, "table", -1, r.isReadabilityDataTable) {
+			return false
+		}
+
+		weight := r.getClassWeight(node)
+		if weight < 0 {
+			return true
+		}
+
+		if r.getCharCount(node, ",") < 10 {
+			// If there are not many commas and the number of non-paragraph
+			// elements is more than paragraphs or other ominous signs, remove
+			// the element.
+			p := float64(len(getElementsByTagName(node, "p")))
+			img := float64(len(getElementsByTagName(node, "img")))
+			li := float64(len(getElementsByTagName(node, "li")) - 100)
+			input := float64(len(getElementsByTagName(node, "input")))
+
+			embedCount := 0
+			embeds := r.concatNodeLists(
+				getElementsByTagName(node, "object"),
+				getElementsByTagName(node, "embed"),
+				getElementsByTagName(node, "iframe"),
+			)
+
+			for _, embed := range embeds {
+				// Do not delete if Embed has attribute matching Video regex.
+				for _, attr := range embed.Attr {
+					if rxVideos.MatchString(attr.Val) {
+						return false
+					}
+				}
+
+				// For embed with <object> tag, check inner HTML as well.
+				if tagName(embed) == "object" && rxVideos.MatchString(innerHTML(embed)) {
+					return false
+				}
+
+				embedCount++
+			}
+
+			linkDensity := r.getLinkDensity(node)
+			contentLength := len(r.getInnerText(node, true))
+
+			return (img > 1 && p/img < 0.5 && !r.hasAncestorTag(node, "figure", 3, nil)) ||
+				(!isList && li > p) ||
+				(input > math.Floor(p/3)) ||
+				(!isList && contentLength < 25 && (img == 0 || img > 2) && !r.hasAncestorTag(node, "figure", 3, nil)) ||
+				(!isList && weight < 25 && linkDensity > 0.2) ||
+				(weight >= 25 && linkDensity > 0.5) ||
+				((embedCount == 1 && contentLength < 75) || embedCount > 1)
+		}
+
+		return false
+	})
 }
 
 // isProbablyVisible determines if a node is visible.
