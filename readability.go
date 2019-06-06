@@ -881,6 +881,30 @@ func (r *Readability) getClassWeight(node *html.Node) int {
 	return weight
 }
 
+// clean cleans a node of all elements of type "tag".
+func (r *Readability) clean(node *html.Node, tag string) {
+	isEmbed := indexOf([]string{"object", "embed", "iframe"}, tag) != -1
+
+	r.removeNodes(getElementsByTagName(node, tag), func(element *html.Node) bool {
+		// Allow YouTube and Vimeo videos through as people usually want to see those.
+		if isEmbed {
+			// Check the attributes to see if any of them contain YouTube or Vimeo.
+			for _, attr := range element.Attr {
+				if rxVideos.MatchString(attr.Val) {
+					return false
+				}
+			}
+
+			// For embed with <object> tag, check inner HTML as well.
+			if tagName(element) == "object" && rxVideos.MatchString(innerHTML(element)) {
+				return false
+			}
+		}
+
+		return true
+	})
+}
+
 // hasAncestorTag checks if a given node has one of its ancestor tag name
 // matching the provided one.
 //
