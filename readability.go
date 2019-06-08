@@ -1124,6 +1124,21 @@ func (r *Readability) cleanConditionally(element *html.Node, tag string) {
 	})
 }
 
+// cleanMatchedNodes cleans out elements whose ID and CSS class combinations
+// match specific string.
+func (r *Readability) cleanMatchedNodes(e *html.Node, filter func(*html.Node, string) bool) {
+	endOfSearchMarkerNode := r.getNextNode(e, true)
+	next := r.getNextNode(e, false)
+
+	for next != nil && next != endOfSearchMarkerNode {
+		if filter != nil && filter(next, className(next)+" "+id(next)) {
+			next = r.removeAndGetNext(next)
+		} else {
+			next = r.getNextNode(next, false)
+		}
+	}
+}
+
 // isProbablyVisible determines if a node is visible.
 func (r *Readability) isProbablyVisible(node *html.Node) bool {
 	style := getAttribute(node, "style")
