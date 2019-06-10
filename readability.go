@@ -1139,6 +1139,18 @@ func (r *Readability) cleanMatchedNodes(e *html.Node, filter func(*html.Node, st
 	}
 }
 
+// cleanHeaders cleans out spurious headers from an Element. Checks things like
+// classnames and link density.
+func (r *Readability) cleanHeaders(e *html.Node) {
+	for headerIndex := 1; headerIndex < 3; headerIndex++ {
+		headerTag := fmt.Sprintf("h%d", headerIndex)
+
+		r.removeNodes(getElementsByTagName(e, headerTag), func(header *html.Node) bool {
+			return r.getClassWeight(header) < 0
+		})
+	}
+}
+
 // isProbablyVisible determines if a node is visible.
 func (r *Readability) isProbablyVisible(node *html.Node) bool {
 	style := getAttribute(node, "style")
