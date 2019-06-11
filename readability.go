@@ -28,6 +28,7 @@ var rxTitleRemoveFinalPart = regexp.MustCompile(`(?i)(.*)[\|\-\\/>»] .*`)
 var rxTitleRemove1stPart = regexp.MustCompile(`(?i)[^\|\-\\/>»]*[\|\-\\/>»](.*)`)
 var rxTitleAnySeparator = regexp.MustCompile(`(?i)[\|\-\\/>»]+`)
 var rxDisplayNone = regexp.MustCompile(`(?i)display\s*:\s*none`)
+var rxShare = regexp.MustCompile(`(?i)share`)
 var rxFaviconSize = regexp.MustCompile(`(?i)(\d+)x(\d+)`)
 
 // divToPElems is a list of HTML tag names representing content dividers.
@@ -90,6 +91,10 @@ type Readability struct {
 	// from the document. If the number of elements in the document is higher
 	// than this number, the operation immediately errors.
 	MaxElemsToParse int
+
+	// CharThresholds is the default number of chars an article must have in
+	// order to return a result.
+	CharThresholds int
 }
 
 // Article represents the metadata and content of the article.
@@ -577,6 +582,122 @@ func (r *Readability) getArticleMetadata() Article {
 		Image:    metadataImage,
 		Favicon:  metadataFavicon,
 	}
+}
+
+// prepArticle prepares the article Node for display cleaning out any inline
+// CSS styles, iframes, forms and stripping extraneous paragraph tags <p>.
+func (r *Readability) prepArticle(articleContent *html.Node) {
+	r.cleanStyles(articleContent)
+
+	// Check for data tables before we continue, to avoid removing
+	// items in those tables, which will often be isolated even
+	// though they're visually linked to other content-ful elements
+	// (text, images, etc.).
+	r.markDataTables(articleContent)
+
+	// Clean out junk from the article content
+	r.cleanConditionally(articleContent, "form")
+	r.cleanConditionally(articleContent, "fieldset")
+	r.clean(articleContent, "object")
+	r.clean(articleContent, "embed")
+	r.clean(articleContent, "h1")
+	r.clean(articleContent, "footer")
+	r.clean(articleContent, "link")
+	r.clean(articleContent, "aside")
+
+	// Clean out elements have "share" in their id/class combinations
+	// from final top candidates, which means we don't remove the top
+	// candidates even they have "share".
+	r.forEachNode(children(articleContent), func(topCandidate *html.Node, _ int) {
+		r.cleanMatchedNodes(topCandidate, func(node *html.Node, nodeClassID string) bool {
+			return rxShare.MatchString(nodeClassID) && len(textContent(node)) < r.CharThresholds
+		})
+	})
+
+	// If there is only one h2 and its text content substantially
+	// equals article title, they are probably using it as a header
+	// and not a subheader, so remove it since we already extract
+	// the title separately.
+	if h2s := getElementsByTagName(articleContent, "h2"); len(h2s) == 1 {
+		h2 := h2s[0]
+		h2Text := textContent(h2)
+		lengthSimilarRate := float64(len(h2Text)-len(r.articleTitle)) / float64(len(r.articleTitle))
+
+		if math.Abs(lengthSimilarRate) < 0.5 {
+			titlesMatch := false
+
+			if lengthSimilarRate > 0 {
+				titlesMatch = strings.Contains(h2Text, r.articleTitle)
+			} else {
+				titlesMatch = strings.Contains(r.articleTitle, h2Text)
+			}
+
+			if titlesMatch {
+				r.clean(articleContent, "h2")
+			}
+		}
+	}
+
+	r.clean(articleContent, "iframe")
+	r.clean(articleContent, "input")
+	r.clean(articleContent, "textarea")
+	r.clean(articleContent, "select")
+	r.clean(articleContent, "button")
+	r.cleanHeaders(articleContent)
+
+	// Do these last as the previous stuff may have removed junk
+	// that will affect these
+	r.cleanConditionally(articleContent, "table")
+	r.cleanConditionally(articleContent, "ul")
+	r.cleanConditionally(articleContent, "div")
+
+	// Remove extra paragraphs
+	r.removeNodes(getElementsByTagName(articleContent, "p"), func(p *html.Node) bool {
+		imgCount := len(getElementsByTagName(p, "img"))
+		embedCount := len(getElementsByTagName(p, "embed"))
+		objectCount := len(getElementsByTagName(p, "object"))
+
+		// Nasty iframes have been removed, only remain embedded videos.
+		iframeCount := len(getElementsByTagName(p, "iframe"))
+		totalCount := imgCount + embedCount + objectCount + iframeCount
+
+		return totalCount == 0 && r.getInnerText(p, false) == ""
+	})
+
+	r.forEachNode(getElementsByTagName(articleContent, "br"), func(br *html.Node, _ int) {
+		next := r.nextElement(br.NextSibling)
+
+		if next != nil && tagName(next) == "p" {
+			br.Parent.RemoveChild(br)
+		}
+	})
+
+	// Remove single-cell tables
+	r.forEachNode(getElementsByTagName(articleContent, "table"), func(table *html.Node, _ int) {
+		tbody := table
+
+		if r.hasSingleTagInsideElement(table, "tbody") {
+			tbody = firstElementChild(table)
+		}
+
+		if r.hasSingleTagInsideElement(tbody, "tr") {
+			row := firstElementChild(tbody)
+
+			if r.hasSingleTagInsideElement(row, "td") {
+				cell := firstElementChild(row)
+
+				newTag := "div"
+
+				if r.everyNode(childNodes(cell), r.isPhrasingContent) {
+					newTag = "p"
+				}
+
+				r.setNodeTag(cell, newTag)
+
+				replaceNode(table, cell)
+			}
+		}
+	})
 }
 
 // initializeNode initializes a node with the readability score. Also checks
