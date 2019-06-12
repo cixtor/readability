@@ -3,8 +3,10 @@ package readability
 import (
 	"fmt"
 	"io"
+	"math"
 	"net/url"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -13,6 +15,8 @@ import (
 
 // All of the regular expressions in use within readability.
 // Defined up here so we don't instantiate them repeatedly in loops.
+var rxUnlikelyCandidates = regexp.MustCompile(`(?i)-ad-|ai2html|banner|breadcrumbs|combx|comment|community|cover-wrap|disqus|extra|foot|gdpr|header|legends|menu|related|remark|replies|rss|shoutbox|sidebar|skyscraper|social|sponsor|supplemental|ad-break|agegate|pagination|pager|popup|yom-remote`)
+var rxOkMaybeItsACandidate = regexp.MustCompile(`(?i)and|article|body|column|main|shadow`)
 var rxPositive = regexp.MustCompile(`(?i)article|body|content|entry|hentry|h-entry|main|page|pagination|post|text|blog|story`)
 var rxNegative = regexp.MustCompile(`(?i)hidden|^hid$| hid$| hid |^hid |banner|combx|comment|com-|contact|foot|footer|footnote|gdpr|masthead|media|meta|outbrain|promo|related|scroll|share|shoutbox|sidebar|skyscraper|sponsor|shopping|tags|tool|widget`)
 var rxByline = regexp.MustCompile(`(?i)byline|author|dateline|writtenby|p-author`)
@@ -28,6 +32,7 @@ var rxTitleRemoveFinalPart = regexp.MustCompile(`(?i)(.*)[\|\-\\/>»] .*`)
 var rxTitleRemove1stPart = regexp.MustCompile(`(?i)[^\|\-\\/>»]*[\|\-\\/>»](.*)`)
 var rxTitleAnySeparator = regexp.MustCompile(`(?i)[\|\-\\/>»]+`)
 var rxDisplayNone = regexp.MustCompile(`(?i)display\s*:\s*none`)
+var rxSentencePeriod = regexp.MustCompile(`(?i)\.( |$)`)
 var rxShare = regexp.MustCompile(`(?i)share`)
 var rxFaviconSize = regexp.MustCompile(`(?i)(\d+)x(\d+)`)
 
@@ -35,6 +40,16 @@ var rxFaviconSize = regexp.MustCompile(`(?i)(\d+)x(\d+)`)
 var divToPElems = []string{
 	"a", "blockquote", "div", "dl", "img",
 	"ol", "p", "pre", "select", "table", "ul",
+}
+
+// alterToDivExceptions is a list of HTML tags that we want to convert into
+// regular DIV elements to prevent unwanted removal when the parser is cleaning
+// out unnecessary Nodes.
+var alterToDivExceptions = []string{
+	"article",
+	"div",
+	"p",
+	"section",
 }
 
 // presentationalAttributes is a list of HTML attributes used to style Nodes.
@@ -77,14 +92,22 @@ var phrasingElems = []string{
 
 // flags is flags that used by parser.
 type flags struct {
+	stripUnlikelys     bool
 	useWeightClasses   bool
 	cleanConditionally bool
+}
+
+// parseAttempt is container for the result of previous parse attempts.
+type parseAttempt struct {
+	articleContent *html.Node
+	textLength     int
 }
 
 type Readability struct {
 	doc           *html.Node
 	documentURI   *url.URL
 	articleByline string
+	attempts      []parseAttempt
 	flags         flags
 
 	// MaxElemsToParse is the optional maximum number of HTML nodes to parse
@@ -92,9 +115,16 @@ type Readability struct {
 	// than this number, the operation immediately errors.
 	MaxElemsToParse int
 
+	// NTopCandidates is the number of top candidates to consider when the
+	// parser is analysing how tight the competition is among candidates.
+	NTopCandidates int
+
 	// CharThresholds is the default number of chars an article must have in
 	// order to return a result.
 	CharThresholds int
+
+	// TagsToScore is element tags to score by default.
+	TagsToScore []string
 }
 
 // Article represents the metadata and content of the article.
@@ -698,6 +728,471 @@ func (r *Readability) prepArticle(articleContent *html.Node) {
 			}
 		}
 	})
+}
+
+// grabArticle uses a variety of metrics (content score, classname, element
+// types), find the content that is most likely to be the stuff a user wants to
+// read. Then return it wrapped up in a div.
+func (r *Readability) grabArticle() *html.Node {
+	for {
+		doc := cloneNode(r.doc)
+
+		var page *html.Node
+		if nodes := getElementsByTagName(doc, "body"); len(nodes) > 0 {
+			page = nodes[0]
+		}
+
+		// We can not grab an article if we do not have a page.
+		if page == nil {
+			return nil
+		}
+
+		// First, node prepping. Trash nodes that look cruddy (like ones with
+		// the class name "comment", etc), and turn divs into P tags where they
+		// have been used inappropriately (as in, where they contain no other
+		// block level elements).
+		var elementsToScore []*html.Node
+		var node = documentElement(doc)
+
+		for node != nil {
+			matchString := className(node) + " " + id(node)
+
+			if !r.isProbablyVisible(node) {
+				node = r.removeAndGetNext(node)
+				continue
+			}
+
+			// Remove Node if it is a Byline.
+			if r.checkByline(node, matchString) {
+				node = r.removeAndGetNext(node)
+				continue
+			}
+
+			// Remove unlikely candidates.
+			nodeTagName := tagName(node)
+			if r.flags.stripUnlikelys {
+				if rxUnlikelyCandidates.MatchString(matchString) &&
+					!rxOkMaybeItsACandidate.MatchString(matchString) &&
+					!r.hasAncestorTag(node, "table", 3, nil) &&
+					nodeTagName != "body" &&
+					nodeTagName != "a" {
+					node = r.removeAndGetNext(node)
+					continue
+				}
+			}
+
+			// Remove DIV, SECTION and HEADER nodes without any content.
+			switch nodeTagName {
+			case "div",
+				"section",
+				"header",
+				"h1",
+				"h2",
+				"h3",
+				"h4",
+				"h5",
+				"h6":
+				if r.isElementWithoutContent(node) {
+					node = r.removeAndGetNext(node)
+					continue
+				}
+			}
+
+			if indexOf(r.TagsToScore, nodeTagName) != -1 {
+				elementsToScore = append(elementsToScore, node)
+			}
+
+			// Convert <div> without children block level elements into <p>.
+			if nodeTagName == "div" {
+				// Put phrasing content into paragraphs.
+				var p *html.Node
+				childNode := node.FirstChild
+
+				for childNode != nil {
+					nextSibling := childNode.NextSibling
+
+					if r.isPhrasingContent(childNode) {
+						if p != nil {
+							appendChild(p, childNode)
+						} else if !r.isWhitespace(childNode) {
+							p = createElement("p")
+							appendChild(p, cloneNode(childNode))
+							replaceNode(childNode, p)
+						}
+					} else if p != nil {
+						for p.LastChild != nil && r.isWhitespace(p.LastChild) {
+							p.RemoveChild(p.LastChild)
+						}
+						p = nil
+					}
+
+					childNode = nextSibling
+				}
+
+				// Sites like http://mobile.slate.com encloses each paragraph
+				// with a DIV element. DIVs with only a P element inside and no
+				// text content can be safely converted into plain P elements to
+				// avoid confusing the scoring algorithm with DIVs with are, in
+				// practice, paragraphs.
+				if r.hasSingleTagInsideElement(node, "p") && r.getLinkDensity(node) < 0.25 {
+					newNode := children(node)[0]
+					replaceNode(node, newNode)
+					node = newNode
+					elementsToScore = append(elementsToScore, node)
+				} else if !r.hasChildBlockElement(node) {
+					r.setNodeTag(node, "p")
+					elementsToScore = append(elementsToScore, node)
+				}
+			}
+
+			node = r.getNextNode(node, false)
+		}
+
+		// Loop through all paragraphs and assign a score to them based on how
+		// much relevant content they have. Then add their score to their parent
+		// node. A score is determined by things like number of commas, class
+		// names, etc. Maybe eventually link density.
+		var candidates []*html.Node
+		r.forEachNode(elementsToScore, func(elementToScore *html.Node, _ int) {
+			if elementToScore.Parent == nil || tagName(elementToScore.Parent) == "" {
+				return
+			}
+
+			// If this paragraph is less than 25 characters, don't even count it.
+			innerText := r.getInnerText(elementToScore, true)
+			if len(innerText) < 25 {
+				return
+			}
+
+			// Exclude nodes with no ancestor.
+			ancestors := r.getNodeAncestors(elementToScore, 3)
+			if len(ancestors) == 0 {
+				return
+			}
+
+			// Add a point for the paragraph itself as a base.
+			contentScore := 1
+
+			// Add points for any commas within this paragraph.
+			contentScore += strings.Count(innerText, ",")
+
+			// For every 100 characters in this paragraph, add another point. Up to 3 points.
+			contentScore += int(math.Min(math.Floor(float64(len(innerText))/100.0), 3.0))
+
+			// Initialize and score ancestors.
+			r.forEachNode(ancestors, func(ancestor *html.Node, level int) {
+				if tagName(ancestor) == "" || ancestor.Parent == nil || ancestor.Parent.Type != html.ElementNode {
+					return
+				}
+
+				if !r.hasContentScore(ancestor) {
+					r.initializeNode(ancestor)
+					candidates = append(candidates, ancestor)
+				}
+
+				// Node score divider:
+				// - parent:             1 (no division)
+				// - grandparent:        2
+				// - great grandparent+: ancestor level * 3
+				scoreDivider := 1
+				switch level {
+				case 0:
+					scoreDivider = 1
+				case 1:
+					scoreDivider = 2
+				default:
+					scoreDivider = level * 3
+				}
+
+				ancestorScore := r.getContentScore(ancestor)
+				ancestorScore += float64(contentScore) / float64(scoreDivider)
+
+				r.setContentScore(ancestor, ancestorScore)
+			})
+		})
+
+		// These lines are a bit different compared to Readability.js.
+		//
+		// In Readability.js, they fetch NTopCandidates utilising array method
+		// like `splice` and `pop`. In Go, array method like that is not as
+		// simple, especially since we are working with pointer. So, here we
+		// simply sort top candidates, and limit it to max NTopCandidates.
+
+		// Scale the final candidates score based on link density. Good
+		// content should have a relatively small link density (5% or
+		// less) and be mostly unaffected by this operation.
+		for i := 0; i < len(candidates); i++ {
+			candidate := candidates[i]
+			candidateScore := r.getContentScore(candidate) * (1 - r.getLinkDensity(candidate))
+			r.setContentScore(candidate, candidateScore)
+		}
+
+		// After we have calculated scores, sort through all of the possible
+		// candidate nodes we found and find the one with the highest score.
+		sort.Slice(candidates, func(i int, j int) bool {
+			return r.getContentScore(candidates[i]) > r.getContentScore(candidates[j])
+		})
+
+		var topCandidates []*html.Node
+
+		if len(candidates) > r.NTopCandidates {
+			topCandidates = candidates[:r.NTopCandidates]
+		} else {
+			topCandidates = candidates
+		}
+
+		var topCandidate, parentOfTopCandidate *html.Node
+		neededToCreateTopCandidate := false
+		if len(topCandidates) > 0 {
+			topCandidate = topCandidates[0]
+		}
+
+		// If we still have no top candidate, just use the body as a last
+		// resort. We also have to copy the body node so it is something
+		// we can modify.
+		if topCandidate == nil || tagName(topCandidate) == "body" {
+			// Move all of the page's children into topCandidate
+			topCandidate = createElement("div")
+			neededToCreateTopCandidate = true
+			// Move everything (not just elements, also text nodes etc.)
+			// into the container so we even include text directly in the body:
+			kids := childNodes(page)
+			for i := 0; i < len(kids); i++ {
+				appendChild(topCandidate, kids[i])
+			}
+
+			appendChild(page, topCandidate)
+			r.initializeNode(topCandidate)
+		} else if topCandidate != nil {
+			// Find a better top candidate node if it contains (at least three)
+			// nodes which belong to `topCandidates` array and whose scores are
+			// quite closed with current `topCandidate` node.
+			topCandidateScore := r.getContentScore(topCandidate)
+			var alternativeCandidateAncestors [][]*html.Node
+			for i := 1; i < len(topCandidates); i++ {
+				if r.getContentScore(topCandidates[i])/topCandidateScore >= 0.75 {
+					topCandidateAncestors := r.getNodeAncestors(topCandidates[i], 0)
+					alternativeCandidateAncestors = append(alternativeCandidateAncestors, topCandidateAncestors)
+				}
+			}
+
+			minimumTopCandidates := 3
+			if len(alternativeCandidateAncestors) >= minimumTopCandidates {
+				parentOfTopCandidate = topCandidate.Parent
+				for parentOfTopCandidate != nil && tagName(parentOfTopCandidate) != "body" {
+					listContainingThisAncestor := 0
+					for ancestorIndex := 0; ancestorIndex < len(alternativeCandidateAncestors) && listContainingThisAncestor < minimumTopCandidates; ancestorIndex++ {
+						if includeNode(alternativeCandidateAncestors[ancestorIndex], parentOfTopCandidate) {
+							listContainingThisAncestor++
+						}
+					}
+
+					if listContainingThisAncestor >= minimumTopCandidates {
+						topCandidate = parentOfTopCandidate
+						break
+					}
+
+					parentOfTopCandidate = parentOfTopCandidate.Parent
+				}
+			}
+
+			if !r.hasContentScore(topCandidate) {
+				r.initializeNode(topCandidate)
+			}
+
+			// Because of our bonus system, parents of candidates might
+			// have scores themselves. They get half of the node. There
+			// won't be nodes with higher scores than our topCandidate,
+			// but if we see the score going *up* in the first few steps *
+			// up the tree, that's a decent sign that there might be more
+			// content lurking in other places that we want to unify in.
+			// The sibling stuff below does some of that - but only if
+			// we've looked high enough up the DOM tree.
+			parentOfTopCandidate = topCandidate.Parent
+			lastScore := r.getContentScore(topCandidate)
+			// The scores shouldn't get too lor.
+			scoreThreshold := lastScore / 3.0
+			for parentOfTopCandidate != nil && tagName(parentOfTopCandidate) != "body" {
+				if !r.hasContentScore(parentOfTopCandidate) {
+					parentOfTopCandidate = parentOfTopCandidate.Parent
+					continue
+				}
+
+				parentScore := r.getContentScore(parentOfTopCandidate)
+				if parentScore < scoreThreshold {
+					break
+				}
+
+				if parentScore > lastScore {
+					// Alright! We found a better parent to use.
+					topCandidate = parentOfTopCandidate
+					break
+				}
+
+				lastScore = parentScore
+				parentOfTopCandidate = parentOfTopCandidate.Parent
+			}
+
+			// If the top candidate is the only child, use parent
+			// instead. This will help sibling joining logic when
+			// adjacent content is actually located in parent's
+			// sibling node.
+			parentOfTopCandidate = topCandidate.Parent
+			for parentOfTopCandidate != nil && tagName(parentOfTopCandidate) != "body" && len(children(parentOfTopCandidate)) == 1 {
+				topCandidate = parentOfTopCandidate
+				parentOfTopCandidate = topCandidate.Parent
+			}
+
+			if !r.hasContentScore(topCandidate) {
+				r.initializeNode(topCandidate)
+			}
+		}
+
+		// Now that we have the top candidate, look through its siblings
+		// for content that might also be related. Things like preambles,
+		// content split by ads that we removed, etc.
+		articleContent := createElement("div")
+		siblingScoreThreshold := math.Max(10, r.getContentScore(topCandidate)*0.2)
+
+		// Keep potential top candidate's parent node to try to get text direction of it later.
+		topCandidateScore := r.getContentScore(topCandidate)
+		topCandidateClassName := className(topCandidate)
+
+		parentOfTopCandidate = topCandidate.Parent
+		siblings := children(parentOfTopCandidate)
+		for s := 0; s < len(siblings); s++ {
+			sibling := siblings[s]
+			appendNode := false
+
+			if sibling == topCandidate {
+				appendNode = true
+			} else {
+				contentBonus := float64(0)
+
+				// Give a bonus if sibling nodes and top candidates have the example same classname
+				if className(sibling) == topCandidateClassName && topCandidateClassName != "" {
+					contentBonus += topCandidateScore * 0.2
+				}
+
+				if r.hasContentScore(sibling) && r.getContentScore(sibling)+contentBonus >= siblingScoreThreshold {
+					appendNode = true
+				} else if tagName(sibling) == "p" {
+					linkDensity := r.getLinkDensity(sibling)
+					nodeContent := r.getInnerText(sibling, true)
+					nodeLength := len(nodeContent)
+
+					if nodeLength > 80 && linkDensity < 0.25 {
+						appendNode = true
+					} else if nodeLength < 80 && nodeLength > 0 && linkDensity == 0 &&
+						rxSentencePeriod.MatchString(nodeContent) {
+						appendNode = true
+					}
+				}
+			}
+
+			if appendNode {
+				// We have a node that is not a common block level element,
+				// like a FORM or TD tag. Turn it into a DIV so it does not get
+				// filtered out later by accident.
+				if indexOf(alterToDivExceptions, tagName(sibling)) == -1 {
+					r.setNodeTag(sibling, "div")
+				}
+
+				appendChild(articleContent, sibling)
+			}
+		}
+
+		// So we have all of the content that we need. Now we clean
+		// it up for presentation.
+		r.prepArticle(articleContent)
+
+		if neededToCreateTopCandidate {
+			// We already created a fake DIV thing, and there would not have
+			// been any siblings left for the previous loop, so there is no
+			// point trying to create a new DIV and then move all the children
+			// over. Just assign IDs and CSS class names here. No need to append
+			// because that already happened anyway.
+			//
+			// By the way, this line is different with Readability.js.
+			//
+			// In Readability.js, when using `appendChild`, the node is still
+			// referenced. Meanwhile here, our `appendChild` will clone the
+			// node, put it in the new place, then delete the original.
+			firstChild := firstElementChild(articleContent)
+			if firstChild != nil && tagName(firstChild) == "div" {
+				setAttribute(firstChild, "id", "readability-page-1")
+				setAttribute(firstChild, "class", "page")
+			}
+		} else {
+			div := createElement("div")
+
+			setAttribute(div, "id", "readability-page-1")
+			setAttribute(div, "class", "page")
+
+			childs := childNodes(articleContent)
+
+			for i := 0; i < len(childs); i++ {
+				appendChild(div, childs[i])
+			}
+
+			appendChild(articleContent, div)
+		}
+
+		parseSuccessful := true
+
+		// Now that we've gone through the full algorithm, check to see if we
+		// got any meaningful content. If we did not, we may need to re-run
+		// grabArticle with different flags set. This gives us a higher
+		// likelihood of finding the content, and the sieve approach gives us a
+		// higher likelihood of finding the -right- content.
+		textLength := len(r.getInnerText(articleContent, true))
+		if textLength < r.CharThresholds {
+			parseSuccessful = false
+
+			if r.flags.stripUnlikelys {
+				r.flags.stripUnlikelys = false
+				r.attempts = append(r.attempts, parseAttempt{
+					articleContent: articleContent,
+					textLength:     textLength,
+				})
+			} else if r.flags.useWeightClasses {
+				r.flags.useWeightClasses = false
+				r.attempts = append(r.attempts, parseAttempt{
+					articleContent: articleContent,
+					textLength:     textLength,
+				})
+			} else if r.flags.cleanConditionally {
+				r.flags.cleanConditionally = false
+				r.attempts = append(r.attempts, parseAttempt{
+					articleContent: articleContent,
+					textLength:     textLength,
+				})
+			} else {
+				r.attempts = append(r.attempts, parseAttempt{
+					articleContent: articleContent,
+					textLength:     textLength,
+				})
+
+				// No luck after removing flags, just return the
+				// longest text we found during the different loops *
+				sort.Slice(r.attempts, func(i, j int) bool {
+					return r.attempts[i].textLength > r.attempts[j].textLength
+				})
+
+				// But first check if we actually have something
+				if r.attempts[0].textLength == 0 {
+					return nil
+				}
+
+				articleContent = r.attempts[0].articleContent
+				parseSuccessful = true
+			}
+		}
+
+		if parseSuccessful {
+			return articleContent
+		}
+	}
 }
 
 // initializeNode initializes a node with the readability score. Also checks
