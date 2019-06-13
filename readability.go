@@ -205,8 +205,7 @@ func (r *Readability) removeNodes(list []*html.Node, filter func(*html.Node) boo
 // replaceNodeTags iterates over a list, and calls setNodeTag for each node.
 func (r *Readability) replaceNodeTags(list []*html.Node, newTagName string) {
 	for i := len(list) - 1; i >= 0; i-- {
-		node := list[i]
-		r.setNodeTag(node, newTagName)
+		r.setNodeTag(list[i], newTagName)
 	}
 }
 
