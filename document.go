@@ -292,26 +292,26 @@ func tagName(node *html.Node) string {
 	return node.Data
 }
 
-// textContent returns text content of a node and its descendants.
+// textContent returns text content of a Node and its descendants.
 //
 // See: https://developer.mozilla.org/en-US/docs/Web/API/Node/textContent
 func textContent(node *html.Node) string {
-	var buf bytes.Buffer
-	var fun func(*html.Node)
+	var buffer bytes.Buffer
+	var finder func(*html.Node)
 
-	fun = func(n *html.Node) {
+	finder = func(n *html.Node) {
 		if n.Type == html.TextNode {
-			buf.WriteString(n.Data)
+			buffer.WriteString(n.Data)
 		}
 
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			fun(c)
+			finder(c)
 		}
 	}
 
-	fun(node)
+	finder(node)
 
-	return buf.String()
+	return buffer.String()
 }
 
 // toAbsoluteURI convert uri to absolute path based on base.
