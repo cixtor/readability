@@ -323,7 +323,7 @@ func (r *Readability) getArticleTitle() string {
 	}
 
 	curTitle = strings.TrimSpace(curTitle)
-	curTitle = rxNormalize.ReplaceAllString(curTitle, " ")
+	curTitle = rxNormalize.ReplaceAllString(curTitle, "\x20")
 	// If we now have 4 words or fewer as our title, and either no
 	// 'hierarchical' separators (\, /, > or ») were found in the original
 	// title or we decreased the number of words by more than 1 word, use
@@ -754,7 +754,7 @@ func (r *Readability) grabArticle() *html.Node {
 		var node = documentElement(doc)
 
 		for node != nil {
-			matchString := className(node) + " " + id(node)
+			matchString := className(node) + "\x20" + id(node)
 
 			if !r.isProbablyVisible(node) {
 				node = r.removeAndGetNext(node)
@@ -1746,7 +1746,7 @@ func (r *Readability) cleanMatchedNodes(e *html.Node, filter func(*html.Node, st
 	next := r.getNextNode(e, false)
 
 	for next != nil && next != endOfSearchMarkerNode {
-		if filter != nil && filter(next, className(next)+" "+id(next)) {
+		if filter != nil && filter(next, className(next)+"\x20"+id(next)) {
 			next = r.removeAndGetNext(next)
 		} else {
 			next = r.getNextNode(next, false)
