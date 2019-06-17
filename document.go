@@ -100,6 +100,11 @@ func createElement(tagName string) *html.Node {
 	return &html.Node{Type: html.ElementNode, Data: tagName}
 }
 
+// createTextNode creates a new Text node.
+func createTextNode(data string) *html.Node {
+	return &html.Node{Type: html.TextNode, Data: data}
+}
+
 // getElementsByTagName returns a collection of HTML elements with the given
 // tag name. If tag name is an asterisk, a list of all the available HTML nodes
 // will be returned instead.
