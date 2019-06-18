@@ -194,6 +194,17 @@ func hasAttribute(node *html.Node, attrName string) bool {
 	return false
 }
 
+// outerHTML returns an HTML serialization of the element and its descendants.
+func outerHTML(node *html.Node) string {
+	var buffer bytes.Buffer
+
+	if err := html.Render(&buffer, node); err != nil {
+		return ""
+	}
+
+	return buffer.String()
+}
+
 // innerHTML returns the HTML content (inner HTML) of an element.
 func innerHTML(node *html.Node) string {
 	var err error
