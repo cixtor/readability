@@ -1773,6 +1773,56 @@ func (r *Readability) isProbablyVisible(node *html.Node) bool {
 	return noStyle && !hasAttribute(node, "hidden")
 }
 
+// fixRelativeURIs converts each <a> and <img> uri in the given element to an
+// absolute URI, ignoring #ref URIs.
+func (r *Readability) fixRelativeURIs(articleContent *html.Node) {
+	links := r.getAllNodesWithTag(articleContent, "a")
+
+	r.forEachNode(links, func(link *html.Node, _ int) {
+		href := getAttribute(link, "href")
+
+		if href == "" {
+			return
+		}
+
+		// Replace links with javascript: URIs with text content, since they
+		// will not work after scripts have been removed from the page.
+		if strings.HasPrefix(href, "javascript:") {
+			text := createTextNode(textContent(link))
+			replaceNode(link, text)
+			return
+		}
+
+		newHref := toAbsoluteURI(href, r.documentURI)
+
+		if newHref == "" {
+			removeAttribute(link, "href")
+			return
+		}
+
+		setAttribute(link, "href", newHref)
+	})
+
+	imgs := r.getAllNodesWithTag(articleContent, "img")
+
+	r.forEachNode(imgs, func(img *html.Node, _ int) {
+		src := getAttribute(img, "src")
+
+		if src == "" {
+			return
+		}
+
+		newSrc := toAbsoluteURI(src, r.documentURI)
+
+		if newSrc == "" {
+			removeAttribute(img, "src")
+			return
+		}
+
+		setAttribute(img, "src", newSrc)
+	})
+}
+
 // Parse runs readability.
 func (r *Readability) Parse() (Article, error) {
 	if r.MaxElemsToParse > 0 {
