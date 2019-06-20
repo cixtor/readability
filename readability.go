@@ -123,6 +123,9 @@ type Readability struct {
 	// order to return a result.
 	CharThresholds int
 
+	// ClassesToPreserve are the classes that readability sets itself.
+	ClassesToPreserve []string
+
 	// TagsToScore is element tags to score by default.
 	TagsToScore []string
 }
@@ -1821,6 +1824,30 @@ func (r *Readability) fixRelativeURIs(articleContent *html.Node) {
 
 		setAttribute(img, "src", newSrc)
 	})
+}
+
+// cleanClasses removes the class="" attribute from every element in the given
+// subtree, except those that match CLASSES_TO_PRESERVE and classesToPreserve
+// array from the options object.
+func (r *Readability) cleanClasses(node *html.Node) {
+	nodeClassName := className(node)
+	preservedClassName := []string{}
+
+	for _, class := range strings.Fields(nodeClassName) {
+		if indexOf(r.ClassesToPreserve, class) != -1 {
+			preservedClassName = append(preservedClassName, class)
+		}
+	}
+
+	if len(preservedClassName) > 0 {
+		setAttribute(node, "class", strings.Join(preservedClassName, "\x20"))
+	} else {
+		removeAttribute(node, "class")
+	}
+
+	for child := firstElementChild(node); child != nil; child = nextElementSibling(child) {
+		r.cleanClasses(child)
+	}
 }
 
 // Parse runs readability.
