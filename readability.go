@@ -1850,6 +1850,16 @@ func (r *Readability) cleanClasses(node *html.Node) {
 	}
 }
 
+// clearReadabilityAttr removes Readability attribute created by the parser.
+func (r *Readability) clearReadabilityAttr(node *html.Node) {
+	removeAttribute(node, "data-readability-score")
+	removeAttribute(node, "data-readability-table")
+
+	for child := firstElementChild(node); child != nil; child = nextElementSibling(child) {
+		r.clearReadabilityAttr(child)
+	}
+}
+
 // Parse runs readability.
 func (r *Readability) Parse() (Article, error) {
 	if r.MaxElemsToParse > 0 {
