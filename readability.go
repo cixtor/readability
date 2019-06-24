@@ -1860,6 +1860,18 @@ func (r *Readability) clearReadabilityAttr(node *html.Node) {
 	}
 }
 
+// postProcessContent runs post-process modifications to the article content.
+func (r *Readability) postProcessContent(articleContent *html.Node) {
+	// Convert relative URIs to absolute URIs so we can open them.
+	r.fixRelativeURIs(articleContent)
+
+	// Remove CSS classes.
+	r.cleanClasses(articleContent)
+
+	// Remove readability attributes.
+	r.clearReadabilityAttr(articleContent)
+}
+
 // Parse runs readability.
 func (r *Readability) Parse() (Article, error) {
 	if r.MaxElemsToParse > 0 {
