@@ -103,9 +103,11 @@ type parseAttempt struct {
 	textLength     int
 }
 
+// Readability is an HTML parser that reads and extract relevant content.
 type Readability struct {
 	doc           *html.Node
 	documentURI   *url.URL
+	articleTitle  string
 	articleByline string
 	attempts      []parseAttempt
 	flags         flags
@@ -171,6 +173,9 @@ type Article struct {
 
 	// Length is the amount of characters in the article.
 	Length int
+
+	// Node is the first element in the HTML document.
+	Node *html.Node
 }
 
 func New(reader io.Reader, rawurl string) (Readability, error) {
@@ -1872,18 +1877,91 @@ func (r *Readability) postProcessContent(articleContent *html.Node) {
 	r.clearReadabilityAttr(articleContent)
 }
 
-// Parse runs readability.
-func (r *Readability) Parse() (Article, error) {
+// Parse parses input and find the main readable content.
+func (r *Readability) Parse(input io.Reader, pageURL string) (Article, error) {
+	var err error
+
+	// Reset parser data
+	r.articleTitle = ""
+	r.articleByline = ""
+	r.attempts = []parseAttempt{}
+	r.flags.stripUnlikelys = true
+	r.flags.useWeightClasses = true
+	r.flags.cleanConditionally = true
+
+	// Parse page URL.
+	if r.documentURI, err = url.ParseRequestURI(pageURL); err != nil {
+		return Article{}, fmt.Errorf("failed to parse URL: %v", err)
+	}
+
+	// Parse input.
+	if r.doc, err = html.Parse(input); err != nil {
+		return Article{}, fmt.Errorf("failed to parse input: %v", err)
+	}
+
+	// Avoid parsing too large documents, as per configuration option.
 	if r.MaxElemsToParse > 0 {
 		numTags := len(getElementsByTagName(r.doc, "*"))
+
 		if numTags > r.MaxElemsToParse {
 			return Article{}, fmt.Errorf("aborting parsing document; %d elements found", numTags)
 		}
 	}
 
+	// Remove script tags from the document.
 	r.removeScripts(r.doc)
 
+	// Prepares the HTML document.
 	r.prepDocument()
 
-	return Article{}, nil
+	// Fetch metadata.
+	metadata := r.getArticleMetadata()
+	r.articleTitle = metadata.Title
+
+	// Try to grab article content.
+	finalHTMLContent := ""
+	finalTextContent := ""
+	readableNode := &html.Node{}
+	articleContent := r.grabArticle()
+
+	if articleContent != nil {
+		r.postProcessContent(articleContent)
+
+		// If we have not found an excerpt in the article's metadata, use the
+		// article's first paragraph as the excerpt. This is used for displaying
+		// a preview of the article's content.
+		if metadata.Excerpt == "" {
+			paragraphs := getElementsByTagName(articleContent, "p")
+
+			if len(paragraphs) > 0 {
+				metadata.Excerpt = strings.TrimSpace(textContent(paragraphs[0]))
+			}
+		}
+
+		readableNode = firstElementChild(articleContent)
+		finalHTMLContent = innerHTML(articleContent)
+		finalTextContent = textContent(articleContent)
+		finalTextContent = strings.TrimSpace(finalTextContent)
+	}
+
+	finalByline := metadata.Byline
+
+	if finalByline == "" {
+		finalByline = r.articleByline
+	}
+
+	return Article{
+		Title:       r.articleTitle,
+		Byline:      finalByline,
+		Node:        readableNode,
+		Content:     finalHTMLContent,
+		TextContent: finalTextContent,
+		Length:      len(finalTextContent),
+		Excerpt:     metadata.Excerpt,
+		SiteName:    metadata.SiteName,
+		Image:       metadata.Image,
+		Favicon:     metadata.Favicon,
+	}, nil
+}
+
 }
