@@ -1964,4 +1964,85 @@ func (r *Readability) Parse(input io.Reader, pageURL string) (Article, error) {
 	}, nil
 }
 
+// IsReadable decides whether the document is usable or not without parsing the
+// whole thing. In the original `mozilla/readability` library, this method is
+// located in `Readability-readable.js`.
+func (r *Readability) IsReadable(input io.Reader) bool {
+	doc, err := html.Parse(input)
+
+	if err != nil {
+		return false
+	}
+
+	// Get <p> and <pre> nodes. Also get DIV nodes which have BR node(s) and
+	// append them into the `nodes` variable. Some articles' DOM structures
+	// might look like:
+	//
+	// <div>
+	//     Sentences<br>
+	//     <br>
+	//     Sentences<br>
+	// </div>
+	//
+	// So we need to make sure only fetch the div once.
+	// To do so, we will use map as dictionary.
+	nodeList := make([]*html.Node, 0)
+	nodeDict := make(map[*html.Node]struct{})
+	var finder func(*html.Node)
+
+	finder = func(node *html.Node) {
+		if node.Type == html.ElementNode {
+			tag := tagName(node)
+			if tag == "p" || tag == "pre" {
+				if _, exist := nodeDict[node]; !exist {
+					nodeList = append(nodeList, node)
+					nodeDict[node] = struct{}{}
+				}
+			} else if tag == "br" && node.Parent != nil && tagName(node.Parent) == "div" {
+				if _, exist := nodeDict[node.Parent]; !exist {
+					nodeList = append(nodeList, node.Parent)
+					nodeDict[node.Parent] = struct{}{}
+				}
+			}
+		}
+
+		for child := node.FirstChild; child != nil; child = child.NextSibling {
+			finder(child)
+		}
+	}
+
+	finder(doc)
+
+	// This is a little cheeky, we use the accumulator 'score' to decide what
+	// to return from this callback.
+	score := float64(0)
+
+	return r.someNode(nodeList, func(node *html.Node) bool {
+		if !r.isProbablyVisible(node) {
+			return false
+		}
+
+		matchString := className(node) + "\x20" + id(node)
+		if rxUnlikelyCandidates.MatchString(matchString) &&
+			!rxOkMaybeItsACandidate.MatchString(matchString) {
+			return false
+		}
+
+		if tagName(node) == "p" && r.hasAncestorTag(node, "li", -1, nil) {
+			return false
+		}
+
+		nodeText := strings.TrimSpace(textContent(node))
+		nodeTextLength := len(nodeText)
+		if nodeTextLength < 140 {
+			return false
+		}
+
+		score += math.Sqrt(float64(nodeTextLength - 140))
+		if score > 20 {
+			return true
+		}
+
+		return false
+	})
 }
