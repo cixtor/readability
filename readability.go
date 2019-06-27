@@ -178,19 +178,15 @@ type Article struct {
 	Node *html.Node
 }
 
-func New(reader io.Reader, rawurl string) (Readability, error) {
-	var err error
-	var r Readability
-
-	if r.documentURI, err = url.ParseRequestURI(rawurl); err != nil {
-		return Readability{}, fmt.Errorf("url.ParseRequestURI %s", err)
+// New returns new Readability with sane defaults to parse simple documents.
+func New() *Readability {
+	return &Readability{
+		MaxElemsToParse:   0,
+		NTopCandidates:    5,
+		CharThresholds:    500,
+		ClassesToPreserve: []string{"page"},
+		TagsToScore:       []string{"section", "h2", "h3", "h4", "h5", "h6", "p", "td", "pre"},
 	}
-
-	if r.doc, err = html.Parse(reader); err != nil {
-		return Readability{}, fmt.Errorf("html.Parse %s", err)
-	}
-
-	return r, nil
 }
 
 // removeNodes iterates over a collection of HTML elements, calls the optional
