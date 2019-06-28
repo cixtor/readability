@@ -1900,7 +1900,7 @@ func (r *Readability) Parse(input io.Reader, pageURL string) (Article, error) {
 		numTags := len(getElementsByTagName(r.doc, "*"))
 
 		if numTags > r.MaxElemsToParse {
-			return Article{}, fmt.Errorf("aborting parsing document; %d elements found", numTags)
+			return Article{}, fmt.Errorf("too many elements: %d", numTags)
 		}
 	}
 

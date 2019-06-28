@@ -1,16 +1,11 @@
-package readability_test
+package readability
 
 import (
 	"strings"
 	"testing"
-
-	"github.com/cixtor/readability"
 )
 
 func TestMaxElemsToParse(t *testing.T) {
-	var err error
-	var r readability.Readability
-
 	input := strings.NewReader(`<html>
 		<head>
 			<title>hello world</title>
@@ -20,22 +15,16 @@ func TestMaxElemsToParse(t *testing.T) {
 		</body>
 		</html>`)
 
-	if r, err = readability.New(input, "https://cixtor.com/blog"); err != nil {
-		t.Fatalf("not initialized: %s", err)
-	}
+	parser := New()
+	parser.MaxElemsToParse = 3
+	_, err := parser.Parse(input, "https://cixtor.com/blog")
 
-	r.MaxElemsToParse = 3
-
-	if _, err = r.Parse(); err == nil {
-		t.Fatalf("MaxElemsToParse should fail if document is too long")
+	if err.Error() != "too many elements: 5" {
+		t.Fatalf("expecting failure due to MaxElemsToParse: %s", err)
 	}
 }
 
 func TestRemoveScripts(t *testing.T) {
-	var err error
-	var a readability.Article
-	var r readability.Readability
-
 	input := strings.NewReader(`<html>
 		<head>
 			<title>hello world</title>
@@ -50,16 +39,13 @@ func TestRemoveScripts(t *testing.T) {
 		</body>
 		</html>`)
 
-	if r, err = readability.New(input, "https://cixtor.com/blog"); err != nil {
-		t.Fatalf("not initialized: %s", err)
-	}
+	a, err := New().Parse(input, "https://cixtor.com/blog")
 
-	if a, err = r.Parse(); err != nil {
+	if err != nil {
 		t.Fatalf("parser failure: %s", err)
 	}
 
-	// TODO(cixtor): modify test to validate the actual content.
-	if a.TextContent != "" {
+	if a.TextContent != "lorem ipsum" {
 		t.Fatalf("scripts were not removed: %s", a.TextContent)
 	}
 }
