@@ -633,7 +633,6 @@ func (r *Readability) prepArticle(articleContent *html.Node) {
 	r.cleanConditionally(articleContent, "fieldset")
 	r.clean(articleContent, "object")
 	r.clean(articleContent, "embed")
-	r.clean(articleContent, "h1")
 	r.clean(articleContent, "footer")
 	r.clean(articleContent, "link")
 	r.clean(articleContent, "aside")
