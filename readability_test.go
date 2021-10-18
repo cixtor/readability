@@ -49,3 +49,19 @@ func TestRemoveScripts(t *testing.T) {
 		t.Fatalf("scripts were not removed: %s", a.TextContent)
 	}
 }
+
+func errColorDiff(label string, a string, b string) error {
+	coloredA := ""
+	coloredB := ""
+	for i := 0; i < len(a); i++ {
+		if b[i] == a[i] {
+			coloredA += a[i : i+1]
+			coloredB += b[i : i+1]
+			continue
+		}
+		coloredA += "\x1b[0;92m" + a[i:] + "\x1b[0m"
+		coloredB += "\x1b[0;91m" + b[i:] + "\x1b[0m"
+		break
+	}
+	return fmt.Errorf("%s\n- %s\n+ %s", label, coloredA, coloredB)
+}
