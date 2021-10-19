@@ -75,3 +75,92 @@ func errColorDiff(label string, a string, b string) error {
 	}
 	return fmt.Errorf("%s\n- %s\n+ %s", label, coloredA, coloredB)
 }
+
+func compareArticleContent(result *html.Node, expected *html.Node) error {
+	// Make sure number of nodes is same
+	resultNodesCount := len(children(result))
+	expectedNodesCount := len(children(expected))
+	if resultNodesCount != expectedNodesCount {
+		return fmt.Errorf(
+			"number of nodes is different, want %d got %d",
+			expectedNodesCount,
+			resultNodesCount,
+		)
+	}
+
+	resultNode := result
+	expectedNode := expected
+	for resultNode != nil && expectedNode != nil {
+		// Get node excerpt
+		resultExcerpt := getNodeExcerpt(resultNode)
+		expectedExcerpt := getNodeExcerpt(expectedNode)
+
+		// Compare tag name
+		resultTagName := tagName(resultNode)
+		expectedTagName := tagName(expectedNode)
+		if resultTagName != expectedTagName {
+			return fmt.Errorf(
+				"tag name is different\nwant: %s (%s)\ngot : %s (%s)",
+				expectedTagName,
+				expectedExcerpt,
+				resultTagName,
+				resultExcerpt,
+			)
+		}
+
+		// Compare attributes
+		resultAttrCount := len(resultNode.Attr)
+		expectedAttrCount := len(expectedNode.Attr)
+		if resultAttrCount != expectedAttrCount {
+			return fmt.Errorf(
+				"number of attributes is different\nwant: %d (%s)\ngot : %d (%s)",
+				expectedAttrCount,
+				expectedExcerpt,
+				resultAttrCount,
+				resultExcerpt,
+			)
+		}
+
+		for _, resultAttr := range resultNode.Attr {
+			expectedAttrVal := getAttribute(expectedNode, resultAttr.Key)
+			switch resultAttr.Key {
+			case "href", "src":
+				resultAttr.Val = strings.TrimSuffix(resultAttr.Val, "/")
+				expectedAttrVal = strings.TrimSuffix(expectedAttrVal, "/")
+			}
+
+			if resultAttr.Val != expectedAttrVal {
+				return fmt.Errorf(
+					"attribute %s is different\nwant: %s (%s)\ngot : %s (%s)",
+					resultAttr.Key,
+					expectedAttrVal,
+					expectedExcerpt,
+					resultAttr.Val,
+					resultExcerpt,
+				)
+			}
+		}
+
+		// Compare text content
+		resultText := strings.TrimSpace(textContent(resultNode))
+		expectedText := strings.TrimSpace(textContent(expectedNode))
+
+		resultText = strings.Join(strings.Fields(resultText), "\x20")
+		expectedText = strings.Join(strings.Fields(expectedText), "\x20")
+
+		if resultText != expectedText {
+			return errColorDiff(
+				"text content is different",
+				expectedExcerpt,
+				resultExcerpt,
+			)
+		}
+
+		// Move to next node
+		r := Readability{}
+		resultNode = r.getNextNode(resultNode, false)
+		expectedNode = r.getNextNode(expectedNode, false)
+	}
+
+	return nil
+}
