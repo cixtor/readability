@@ -1,6 +1,7 @@
 package readability
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -48,6 +49,15 @@ func TestRemoveScripts(t *testing.T) {
 	if a.TextContent != "lorem ipsum" {
 		t.Fatalf("scripts were not removed: %s", a.TextContent)
 	}
+}
+
+func getNodeExcerpt(node *html.Node) string {
+	outer := outerHTML(node)
+	outer = strings.Join(strings.Fields(outer), "\x20")
+	if len(outer) < 500 {
+		return outer
+	}
+	return outer[:500]
 }
 
 func errColorDiff(label string, a string, b string) error {
