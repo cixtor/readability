@@ -1860,6 +1860,27 @@ func (r *Readability) clearReadabilityAttr(node *html.Node) {
 	}
 }
 
+func (r *Readability) removeComments(doc *html.Node) {
+	var comments []*html.Node
+	var finder func(*html.Node)
+
+	finder = func(node *html.Node) {
+		if node.Type == html.CommentNode {
+			comments = append(comments, node)
+		}
+
+		for child := node.FirstChild; child != nil; child = child.NextSibling {
+			finder(child)
+		}
+	}
+
+	for child := doc.FirstChild; child != nil; child = child.NextSibling {
+		finder(child)
+	}
+
+	r.removeNodes(comments, nil)
+}
+
 // postProcessContent runs post-process modifications to the article content.
 func (r *Readability) postProcessContent(articleContent *html.Node) {
 	// Convert relative URIs to absolute URIs so we can open them.
