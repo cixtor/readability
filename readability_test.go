@@ -2,8 +2,13 @@ package readability
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"golang.org/x/net/html"
 )
 
 func TestMaxElemsToParse(t *testing.T) {
@@ -163,4 +168,60 @@ func compareArticleContent(result *html.Node, expected *html.Node) error {
 	}
 
 	return nil
+}
+
+func TestParse(t *testing.T) {
+	testDir := "scenarios"
+	testItems, err := ioutil.ReadDir(testDir)
+	if err != nil {
+		t.Errorf("\nfailed to read test directory")
+	}
+
+	for _, item := range testItems {
+		if !item.IsDir() {
+			continue
+		}
+
+		t.Run(item.Name(), func(t1 *testing.T) {
+			// Open test file
+			testFilePath := filepath.Join(testDir, item.Name(), "source.html")
+			testFile, err := os.Open(testFilePath)
+			if err != nil {
+				t1.Errorf("\nfailed to open test file")
+			}
+			defer testFile.Close()
+
+			// Open expected result file
+			expectedFilePath := filepath.Join(testDir, item.Name(), "expected.html")
+			expectedFile, err := os.Open(expectedFilePath)
+			if err != nil {
+				t1.Errorf("\nfailed to open expected result file")
+			}
+			defer expectedFile.Close()
+
+			// Parse expected result
+			expectedHTML, err := html.Parse(expectedFile)
+			if err != nil {
+				t1.Errorf("\nfailed to parse expected result file")
+			}
+
+			// Get article from test file
+			resultArticle, err := New().Parse(testFile, "http://fakehost/test/page.html")
+			if err != nil {
+				t1.Errorf("\nfailed to parse test file")
+			}
+
+			// Parse article into HTML
+			resultHTML, err := html.Parse(strings.NewReader(resultArticle.Content))
+			if err != nil {
+				t1.Errorf("\nfailed to parse test article into HTML")
+			}
+
+			// Compare article
+			err = compareArticleContent(resultHTML, expectedHTML)
+			if err != nil {
+				t1.Errorf("\n%v", err)
+			}
+		})
+	}
 }
