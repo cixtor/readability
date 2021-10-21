@@ -1860,6 +1860,20 @@ func (r *Readability) clearReadabilityAttr(node *html.Node) {
 	}
 }
 
+func (r *Readability) isSingleImage(node *html.Node) bool {
+	if tagName(node) == "img" {
+		return true
+	}
+
+	children := children(node)
+	textContent := textContent(node)
+	if len(children) != 1 || strings.TrimSpace(textContent) != "" {
+		return false
+	}
+
+	return r.isSingleImage(children[0])
+}
+
 func (r *Readability) removeComments(doc *html.Node) {
 	var comments []*html.Node
 	var finder func(*html.Node)
