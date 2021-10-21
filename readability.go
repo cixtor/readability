@@ -1771,9 +1771,15 @@ func (r *Readability) cleanHeaders(e *html.Node) {
 
 // isProbablyVisible determines if a node is visible.
 func (r *Readability) isProbablyVisible(node *html.Node) bool {
-	style := getAttribute(node, "style")
-	noStyle := (style == "" || !rxDisplayNone.MatchString(style))
-	return noStyle && !hasAttribute(node, "hidden")
+	nodeStyle := getAttribute(node, "style")
+	nodeAriaHidden := getAttribute(node, "aria-hidden")
+	className := getAttribute(node, "class")
+
+	return (nodeStyle == "" || !rxDisplayNone.MatchString(nodeStyle)) &&
+		!hasAttribute(node, "hidden") &&
+		(nodeAriaHidden == "" ||
+			nodeAriaHidden != "true" ||
+			strings.Contains(className, "fallback-image"))
 }
 
 // fixRelativeURIs converts each <a> and <img> uri in the given element to an
