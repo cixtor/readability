@@ -103,35 +103,6 @@ type parseAttempt struct {
 	textLength     int
 }
 
-// Readability is an HTML parser that reads and extract relevant content.
-type Readability struct {
-	doc           *html.Node
-	documentURI   *url.URL
-	articleTitle  string
-	articleByline string
-	attempts      []parseAttempt
-	flags         flags
-
-	// MaxElemsToParse is the optional maximum number of HTML nodes to parse
-	// from the document. If the number of elements in the document is higher
-	// than this number, the operation immediately errors.
-	MaxElemsToParse int
-
-	// NTopCandidates is the number of top candidates to consider when the
-	// parser is analysing how tight the competition is among candidates.
-	NTopCandidates int
-
-	// CharThresholds is the default number of chars an article must have in
-	// order to return a result.
-	CharThresholds int
-
-	// ClassesToPreserve are the classes that readability sets itself.
-	ClassesToPreserve []string
-
-	// TagsToScore is element tags to score by default.
-	TagsToScore []string
-}
-
 // Article represents the metadata and content of the article.
 type Article struct {
 	// Title is the heading that preceeds the article’s content, and the basis
@@ -178,6 +149,37 @@ type Article struct {
 	Node *html.Node
 }
 
+// Readability is an HTML parser that reads and extract relevant content.
+type Readability struct {
+	doc           *html.Node
+	documentURI   *url.URL
+	articleTitle  string
+	articleByline string
+	attempts      []parseAttempt
+	flags         flags
+
+	// MaxElemsToParse is the optional maximum number of HTML nodes to parse
+	// from the document. If the number of elements in the document is higher
+	// than this number, the operation immediately errors.
+	MaxElemsToParse int
+
+	// NTopCandidates is the number of top candidates to consider when the
+	// parser is analysing how tight the competition is among candidates.
+	NTopCandidates int
+
+	// CharThresholds is the default number of chars an article must have in
+	// order to return a result.
+	CharThresholds int
+
+	// ClassesToPreserve are the classes that readability sets itself.
+	ClassesToPreserve []string
+
+	// TagsToScore is element tags to score by default.
+	TagsToScore []string
+
+	KeepClasses bool
+}
+
 // New returns new Readability with sane defaults to parse simple documents.
 func New() *Readability {
 	return &Readability{
@@ -186,6 +188,7 @@ func New() *Readability {
 		CharThresholds:    500,
 		ClassesToPreserve: []string{"page"},
 		TagsToScore:       []string{"section", "h2", "h3", "h4", "h5", "h6", "p", "td", "pre"},
+		KeepClasses:       false,
 	}
 }
 
