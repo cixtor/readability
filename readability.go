@@ -1396,12 +1396,10 @@ func (r *Readability) isPhrasingContent(node *html.Node) bool {
 		r.everyNode(childNodes(node), r.isPhrasingContent))
 }
 
+// isWhitespace determines if a node only used as whitespace.
 func (r *Readability) isWhitespace(node *html.Node) bool {
-	if node.Type == html.TextNode && strings.TrimSpace(textContent(node)) == "" {
-		return true
-	}
-
-	return node.Type == html.ElementNode && tagName(node) == "br"
+	return (node.Type == html.TextNode && strings.TrimSpace(textContent(node)) == "") ||
+		(node.Type == html.ElementNode && tagName(node) == "br")
 }
 
 // getInnerText gets the inner text of a node.
